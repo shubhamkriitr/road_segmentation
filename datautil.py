@@ -140,6 +140,74 @@ class CILRoadSegmentationTestDataset(CILRoadSegmentationDataset):
 
 
 
+class BaseSegmentationDataTransformer:
+
+    def __init__(self, config=None) -> None:
+        self.default_config = {
+
+        }
+        if config is not None:
+            self.config = config
+        else:
+            self.config = self.default_config
+    
+    def transform(*args, **kwargs):
+        raise NotImplementedError()
+
+
+class SegmentationTrainingDataTransformer(BaseSegmentationDataTransformer):
+
+    def __init__(self, config=None) -> None:
+        super().__init__(config)
+        self.transformation_group_list = [
+            self.transfrom_group_a,
+            self.transform_group_b
+        ]
+        self.group_probs = [0.5, 0.25, 0.25]
+        self.probability_threshold = self.get_probability_thresolds(
+            self.group_probs)
+    
+    def transform(self, input_, target):
+        # Note some transfroms should only change the input (X) not Y
+        # while others it should mirror in Y as well
+        
+
+        p = np.random.random()
+        transformed_input, transformed_target = input_, target
+        for idx, p_threshold in enumerate(self.probability_threshold):
+            if p <= p_threshold:
+                transformed_input, transformed_target \
+                    = self.transformation_group_list[idx](input_, target)
+        
+        return transformed_input, transformed_target
+
+
+    
+    def get_probability_thresolds(self, probability_list):
+        prob_threshold = []
+        running_sum = 0
+        for p in probability_list:
+            running_sum += p
+            prob_threshold.append(running_sum)
+        
+        assert prob_threshold[-1] == 1.0
+        return prob_threshold
+
+    
+    def transfrom_group_a(self, input_, target):
+        #probability of components of each group must sum to 1
+        pass
+
+    def transform_group_b(self, input, target):
+        pass
+
+    def register_transformation(self, transformation):
+        # TODO: to be implemented if needed
+        raise NotImplementedError()
+
+# Transforms
+
+
 if __name__ == "__main__":
 
     ds = CILRoadSegmentationDataset(DEFAULT_TRAINING_DATASET_ROOTDIR)
