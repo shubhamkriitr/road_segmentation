@@ -156,7 +156,6 @@ train_data, dev_data = [torch.utils.data.DataLoader(dataset, batch_size=10, shuf
 
 epochs = 100
 unet = UNet().to(device)
-unet = torch.load("./model/2022-03-18_13-13_epoch10.pkl").to(device)
 unet.custom_train(train_data, dev_data, epochs, save_freq=10)
 
 pred = unet(torch.stack([train_dataset[0][0]]))[0]
