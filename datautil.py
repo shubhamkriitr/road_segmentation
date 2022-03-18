@@ -8,6 +8,7 @@ import logging
 import PIL
 import numpy as np
 import cv2
+import random
 
 cv2.threshold
 
@@ -117,7 +118,8 @@ class CILRoadSegmentationTrainingDataset(CILRoadSegmentationDataset):
         # NOTE: creating probability map from the ground truth image
         output_map = output_map//255
 
-        return self.to_tensor(input_image), self.to_tensor(output_map)
+        return self.to_tensor(input_image).transpose(1, 2).transpose(0, 1),\
+         self.to_tensor(output_map).unsqueeze(0)
 
 class CILRoadSegmentationTestDataset(CILRoadSegmentationDataset):
     def __init__(self, rootdir=DEFAULT_TEST_DATASET_ROOTDIR,
@@ -136,16 +138,15 @@ class CILRoadSegmentationTestDataset(CILRoadSegmentationDataset):
                                             self.index_to_filename(index)))
         # torchvision requires image in [0, 1) range for float dtype
         input_image = np.clip(input_image/255, a_min=0, a_max= 1 - 1e-7)
-        return self.to_tensor(input_image)
+        return self.to_tensor(input_image).transpose(1, 2).transpose(0, 1)
 
 
+# NOTE: https://pytorch.org/vision/stable/transforms.html
+# https://github.com/pytorch/vision/blob/main/references/segmentation/transforms.py
 
 class BaseSegmentationDataTransformer:
 
     def __init__(self, config=None) -> None:
-        self.default_config = {
-
-        }
         if config is not None:
             self.config = config
         else:
@@ -158,15 +159,32 @@ class BaseSegmentationDataTransformer:
 class SegmentationTrainingDataTransformer(BaseSegmentationDataTransformer):
 
     def __init__(self, config=None) -> None:
-        super().__init__(config)
+        self.default_config = {
+            "group_probs" : [0.5, 0.125, 0.125, 0.125, 0.125]
+        }
+        super().__init__(config=config) #self.config gets overridden by
+        # `self.default_config` if `config` it is None
+
         self.transformation_group_list = [
+            self.identity_transform,
             self.transfrom_group_a,
-            self.transform_group_b
+            self.transform_group_b,
+            self.transform_group_c,
+            self.transform_group_d
         ]
-        self.group_probs = [0.5, 0.25, 0.25]
+        self.group_probs = self.config["group_probs"]
+        assert len(self.transformation_group_list) == len(self.group_probs)
         self.probability_threshold = self.get_probability_thresolds(
             self.group_probs)
+
+        self.rotation = SegRotationTransform()
+        self.hflip = SegHorizontalFlip()
+        self.vflip = SegVerticalFlip()
+        self.brightness = SegAdjustBrightness()
     
+    def identity_transform(self, input_, target):
+        return input_, target
+
     def transform(self, input_, target):
         # Note some transfroms should only change the input (X) not Y
         # while others it should mirror in Y as well
@@ -178,8 +196,7 @@ class SegmentationTrainingDataTransformer(BaseSegmentationDataTransformer):
             if p <= p_threshold:
                 transformed_input, transformed_target \
                     = self.transformation_group_list[idx](input_, target)
-        
-        return transformed_input, transformed_target
+                return transformed_input, transformed_target
 
 
     
@@ -196,16 +213,66 @@ class SegmentationTrainingDataTransformer(BaseSegmentationDataTransformer):
     
     def transfrom_group_a(self, input_, target):
         #probability of components of each group must sum to 1
-        pass
+        return self.rotation(input_, target)
 
-    def transform_group_b(self, input, target):
-        pass
+    def transform_group_b(self, input_, target):
+        return self.hflip(input_, target)
+
+    def transform_group_c(self, input_, target):
+        return self.vflip(input_, target)
+    
+    def transform_group_d(self, input_, target):
+        return self.brightness(input_, target)
 
     def register_transformation(self, transformation):
         # TODO: to be implemented if needed
         raise NotImplementedError()
 
 # Transforms
+
+# Using prefix `Seg` (for segmentation) to the classes below to distinguish
+# them from torchvision's  classes
+class SegRotationTransform:
+    def __init__(self, angles=None):
+
+        self.angles = angles
+        if self.angles is None:
+            self.angles = [30, 60, 90, 120, 180]
+
+    def __call__(self, x, y):
+        angle = random.choice(self.angles)
+        return TF.rotate(x, angle), TF.rotate(y, angle)
+
+class SegHorizontalFlip:
+    def __init__(self, *args, **kwargs) -> None:
+        #no attrs
+        pass
+
+    def __call__(self, x, y):
+        return TF.hflip(x), TF.hflip(y)
+
+
+class SegVerticalFlip:
+    def __init__(self, *args, **kwargs) -> None:
+        #no attrs
+        pass
+
+    def __call__(self, x, y):
+        return TF.vflip(x), TF.vflip(y)
+
+class SegAdjustBrightness:
+    def __init__(self, brightness_factors=None) -> None:
+        #no attrs
+        self.brightness_factors = brightness_factors
+        if self.brightness_factors is None:
+            self.brightness_factors = [0.5, 0.8, 1.2, 1.5]
+
+    def __call__(self, x, y):
+        factor = random.choice(self.brightness_factors)
+        return TF.adjust_brightness(x, brightness_factor=factor), y
+
+        
+
 
 
 if __name__ == "__main__":
@@ -223,10 +290,17 @@ if __name__ == "__main__":
 
     from matplotlib import pyplot as plt
 
+    data_aug = SegmentationTrainingDataTransformer(
+        config={
+            "group_probs" : [ 1.0, 0., 0., 0., 0.] #[0.5, 0.125, 0.125, 0.125, 0.125]
+        }
+    )
+
     for idx, batch_data in enumerate(train_dataloader):
         if idx == n1:
             break
-        x, y = batch_data
+        x_, y_ = batch_data
+        x, y = data_aug.transform(x_, y_)
         plt.imshow(x[0].numpy())
         plt.show()
         if y is not None:
