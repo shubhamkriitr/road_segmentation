@@ -2,13 +2,15 @@ import numpy as np
 import torch
 from torch.utils.tensorboard import SummaryWriter
 import collections
+from datetime import datetime
 
 import os
 import imageio
 
 torch.manual_seed(42)
 
-#TODO: move to GPU when available
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"will train on {device}")
 
 class UNetLevel(torch.nn.Module):
     def __init__(self, layers, dim_coef, in_channels, out_channels):
@@ -86,6 +88,8 @@ class UNet(torch.nn.Module):
         ]))
         self.loss = torch.nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.parameters())
+        self.epoch = 0
+        self.run_id = datetime.now().strftime("%Y-%m-%d_%H-%M")
     def forward(self, x):
         x, outs = self.encoder(x)
         outs.pop(-1) #no resisual connection from the last encoder level
@@ -93,34 +97,69 @@ class UNet(torch.nn.Module):
         x = self.decoder(x, outs)
         x = self.decoder_top(x)
         return x
-    def custom_train(self, x, y, epochs):
-        writer = SummaryWriter("./logs")
-        writer.add_graph(self, x)
-        for e in range(epochs): #TODO: split to batches
-            pred = self.forward(x)
-            loss = self.loss(pred, y)
-            print(f"epoch {e+1} loss before update: {loss}")
-            self.optimizer.zero_grad()
-            loss.backward()
-            self.optimizer.step()
-        print(f"loss after epoch {epochs} update: {self.loss(self.forward(x), y)}")
+    def custom_train(self, train_data, dev_data, epochs, save_freq=None):
+        print(f"starting training with run id {self.run_id}")
+        for d in ["./model", "./logs"]:
+            if not os.path.exists(d): os.makedirs(d)
+        writer = SummaryWriter(os.path.join("logs", self.run_id))
+        for e in range(self.epoch, epochs):
+            epoch_loss = 0
+            for idx, (x, y) in enumerate(train_data):
+                if e == 0 and idx == 0: writer.add_graph(self, x)
+                pred = self.forward(x)
+                loss = self.loss(pred, y)
+                epoch_loss += loss
+                print(f"epoch {e+1}, batch {idx+1}/{len(train_data)} loss: {loss}")
+                self.optimizer.zero_grad()
+                loss.backward()
+                self.optimizer.step()
+            epoch_loss /= len(train_data)
+            writer.add_scalar("loss", epoch_loss, e)
+            if save_freq is not None and ((e+1) % save_freq == 0 or e+1 == epochs):
+                self.epoch = e+1
+                checkpoint_name = f"{self.run_id}_epoch{e+1}"
+                checkpoint_path = f"./model/{checkpoint_name}.pkl"
+                print(f"saving model to {checkpoint_path}")
+                torch.save(self, checkpoint_path)
+
+        writer.flush()
+
+class Dataset(torch.utils.data.Dataset):
+    def __init__(self, img_dir, groundtruth_dir, start, end):
+        self.img_dir, self.groundtruth_dir = img_dir, groundtruth_dir
+        self.img_list = os.listdir(img_dir)
+        try:
+            foo = Dataset.permutation
+        except AttributeError: #generate a random permutation to achieve a random split between train and test data
+            generator = np.random.Generator(np.random.PCG64(42))
+            perm = np.array(list(range(len(self.img_list))))
+            generator.shuffle(perm)
+            Dataset.permutation = perm
+        self.img_list = [self.img_list[i] for i in Dataset.permutation]
+        n_examples = len(self.img_list)
+        if end is not None:
+            self.img_list = self.img_list[start:end]
+        else:
+            self.img_list = self.img_list[start:]
+    def __len__(self):
+        return len(self.img_list)
+    def __getitem__(self, idx):
+        x, y = [np.array(imageio.imread(os.path.join(im_dir, self.img_list[idx]))) for im_dir in [self.img_dir, self.groundtruth_dir]]
+        x = torch.tensor(np.transpose(x[:, :, :3], [2, 0, 1]), dtype=torch.float32) #TODO: float64?
+        y = torch.tensor(y, dtype=torch.float32) / 255
+        y = torch.stack([y, 1-y], dim=0)
+        return x.to(device), y.to(device)
 
 img_dir, groundtruth_dir = "./data/training/images", "./data/training/groundtruth"
-img_list = os.listdir(img_dir)
-x_arrs = [np.array(imageio.imread(os.path.join(img_dir, img)))[:, :, :3] for img in img_list]
-y_arrs = [np.array(imageio.imread(os.path.join(groundtruth_dir, img))) for img in img_list]
-x = torch.tensor(np.transpose(np.stack(x_arrs), [0, 3, 1, 2]), dtype=torch.float32)
-y = torch.tensor(np.stack(y_arrs), dtype=torch.float32) / 255
-
-y = torch.stack([y, 1-y], dim=1)
+train_dataset, dev_dataset = Dataset(img_dir, groundtruth_dir, 10, None), Dataset(img_dir, groundtruth_dir, 0, 10)
+train_data, dev_data = [torch.utils.data.DataLoader(dataset, batch_size=10, shuffle=True) for dataset in (train_dataset, dev_dataset)]
 
 epochs = 100
-checkpoint_path = f"./model/model_{epochs}.pkl"
-unet = UNet()
-unet.custom_train(x[:1], y[:1], epochs) #TODO: train on more data than just one image
-#torch.save(unet, checkpoint_path)
+unet = UNet().to(device)
+unet = torch.load("./model/2022-03-18_13-13_epoch10.pkl").to(device)
+unet.custom_train(train_data, dev_data, epochs, save_freq=10)
 
-pred = unet(x[:1])[0]
+pred = unet(torch.stack([train_dataset[0][0]]))[0]
 pred = torch.where(pred[0] >= pred[1], 255 * torch.ones_like(pred[0]), torch.zeros_like(pred[0])).to(torch.uint8)
 
 imageio.imwrite("./output_mask.png", pred)
