@@ -107,6 +107,9 @@ class CILRoadSegmentationTrainingDataset(CILRoadSegmentationDataset):
     def __getitem__(self, index: int):
         input_image = self.load_image(  os.path.join(self.input_data_folder,
                                         self.index_to_filename(index)))
+        # torchvision requires image in [0, 1) range for float dtype
+        input_image = np.clip(input_image/255, a_min=0, a_max= 1 - 1e-7)
+
         output_map = self.load_image(
             os.path.join(self.groundtruth_output_data_folder,
                     self.index_to_filename(index)))
@@ -131,6 +134,8 @@ class CILRoadSegmentationTestDataset(CILRoadSegmentationDataset):
         index = index + TEST_DATASET_INDEX_OFFSET
         input_image = self.load_image(Path(self.input_data_folder,
                                             self.index_to_filename(index)))
+        # torchvision requires image in [0, 1) range for float dtype
+        input_image = np.clip(input_image/255, a_min=0, a_max= 1 - 1e-7)
         return self.to_tensor(input_image)
 
 
@@ -154,13 +159,13 @@ if __name__ == "__main__":
         if idx == n1:
             break
         x, y = batch_data
-        plt.imshow(x[0].numpy().astype(np.uint))
+        plt.imshow(x[0].numpy())
         plt.show()
         if y is not None:
             plt.imshow(y[0].numpy())
             plt.show()
 
-        plt.imshow(x[-1].numpy().astype(np.uint))
+        plt.imshow(x[-1].numpy())
         plt.show()
         if y is not None:
             plt.imshow(y[-1].numpy())
@@ -170,11 +175,11 @@ if __name__ == "__main__":
         if idx == n2:
             break
         x = batch_data
-        plt.imshow(x[0].numpy().astype(np.uint))
+        plt.imshow(x[0].numpy())
         plt.show()
         
 
-        plt.imshow(x[-1].numpy().astype(np.uint))
+        plt.imshow(x[-1].numpy())
         plt.show()
        
         
