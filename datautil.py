@@ -3,7 +3,13 @@ from pathlib import Path
 import os
 import torchvision.transforms.functional as TF
 import torchvision
+import torch
 import logging
+import PIL
+import numpy as np
+import cv2
+
+cv2.threshold
 
 logger = logging.getLogger(name=__name__)
 
@@ -15,6 +21,12 @@ DEFAULT_TEST_DATASET_ROOTDIR \
     = "resources/dataset/cil-road-segmentation-2022/test"
 IMG_EXT = ".png"
 IMG_PREFIX = "satimage_"
+
+# TODO: better to take this from run config sigleton
+TENSOR_FLOAT_DTYPE = torch.float32
+
+# test files are numbered from 144
+TEST_DATASET_INDEX_OFFSET = 144
 
 
 class CILRoadSegmentationDataset(Dataset):
@@ -61,7 +73,13 @@ class CILRoadSegmentationDataset(Dataset):
 
 
     def load_image(self, image_path):
-        return torchvision.io.read_image(image_path)
+        # N.B.: img_array is of unit8 dtype with pixel value range [0-255]
+        # normalize it later in the pipeline or store normalized version
+        img_array = np.asarray(PIL.Image.open(image_path))
+        return img_array
+
+    def to_tensor(self, img_array):
+        return torch.tensor(data=img_array, dtype=TENSOR_FLOAT_DTYPE)
         
 
     def __len__(self) -> int:
@@ -90,10 +108,13 @@ class CILRoadSegmentationTrainingDataset(CILRoadSegmentationDataset):
         input_image = self.load_image(  os.path.join(self.input_data_folder,
                                         self.index_to_filename(index)))
         output_map = self.load_image(
-            Path(self.groundtruth_output_data_folder,
+            os.path.join(self.groundtruth_output_data_folder,
                     self.index_to_filename(index)))
 
-        return input_image, output_map
+        # NOTE: creating probability map from the ground truth image
+        output_map = output_map//255
+
+        return self.to_tensor(input_image), self.to_tensor(output_map)
 
 class CILRoadSegmentationTestDataset(CILRoadSegmentationDataset):
     def __init__(self, rootdir=DEFAULT_TEST_DATASET_ROOTDIR,
@@ -107,9 +128,10 @@ class CILRoadSegmentationTestDataset(CILRoadSegmentationDataset):
         return self.num_samples
 
     def __getitem__(self, index: int):
+        index = index + TEST_DATASET_INDEX_OFFSET
         input_image = self.load_image(Path(self.input_data_folder,
                                             self.index_to_filename(index)))
-        return input_image, None
+        return self.to_tensor(input_image)
 
 
 
@@ -118,8 +140,42 @@ if __name__ == "__main__":
     ds = CILRoadSegmentationDataset(DEFAULT_TRAINING_DATASET_ROOTDIR)
 
     train_dataset = CILRoadSegmentationTrainingDataset(DEFAULT_TRAINING_DATASET_ROOTDIR)
-    train_dataloader = DataLoader(train_dataset, batch_size=16)
+    test_dataset = CILRoadSegmentationTestDataset(DEFAULT_TEST_DATASET_ROOTDIR)
 
-    for batch_data in train_dataloader:
+    train_dataloader = DataLoader(train_dataset, batch_size=16, shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False)
+
+    n1 = 2 
+    n2 = 2
+
+    from matplotlib import pyplot as plt
+
+    for idx, batch_data in enumerate(train_dataloader):
+        if idx == n1:
+            break
         x, y = batch_data
-        z = x.shape
+        plt.imshow(x[0].numpy().astype(np.uint))
+        plt.show()
+        if y is not None:
+            plt.imshow(y[0].numpy())
+            plt.show()
+
+        plt.imshow(x[-1].numpy().astype(np.uint))
+        plt.show()
+        if y is not None:
+            plt.imshow(y[-1].numpy())
+            plt.show()
+
+    for idx, batch_data in enumerate(test_dataloader):
+        if idx == n2:
+            break
+        x = batch_data
+        plt.imshow(x[0].numpy().astype(np.uint))
+        plt.show()
+        
+
+        plt.imshow(x[-1].numpy().astype(np.uint))
+        plt.show()
+       
+        
+        
