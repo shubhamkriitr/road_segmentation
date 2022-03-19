@@ -109,6 +109,8 @@ class CILRoadSegmentationTrainingDataset(CILRoadSegmentationDataset):
         input_image = self.load_image(  os.path.join(self.input_data_folder,
                                         self.index_to_filename(index)))
         # torchvision requires image in [0, 1) range for float dtype
+        input_image = input_image[:, :, 0:3] # Dropping fourth channel
+        # as it has uninformative data (all values are 255)
         input_image = np.clip(input_image/255, a_min=0, a_max= 1 - 1e-7)
 
         output_map = self.load_image(
@@ -292,7 +294,7 @@ if __name__ == "__main__":
 
     data_aug = SegmentationTrainingDataTransformer(
         config={
-            "group_probs" : [ 1.0, 0., 0., 0., 0.] #[0.5, 0.125, 0.125, 0.125, 0.125]
+            "group_probs" : [ 0.0, 1.0, 0., 0., 0.] #[0.5, 0.125, 0.125, 0.125, 0.125]
         }
     )
 
@@ -300,7 +302,10 @@ if __name__ == "__main__":
         if idx == n1:
             break
         x_, y_ = batch_data
-        x, y = data_aug.transform(x_, y_)
+        x_t, y_t = data_aug.transform(x_, y_)
+
+        x, y = torch.transpose(x_t, 1, 2).transpose(2, 3), y_t.transpose(1, 2).transpose(2, 3)
+        # 
         plt.imshow(x[0].numpy())
         plt.show()
         if y is not None:
