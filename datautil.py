@@ -108,9 +108,10 @@ class CILRoadSegmentationTrainingDataset(CILRoadSegmentationDataset):
     def __getitem__(self, index: int):
         input_image = self.load_image(  os.path.join(self.input_data_folder,
                                         self.index_to_filename(index)))
-        # torchvision requires image in [0, 1) range for float dtype
         input_image = input_image[:, :, 0:3] # Dropping fourth channel
         # as it has uninformative data (all values are 255)
+
+        # torchvision requires image in [0, 1) range for float dtype
         input_image = np.clip(input_image/255, a_min=0, a_max= 1 - 1e-7)
 
         output_map = self.load_image(
@@ -138,6 +139,8 @@ class CILRoadSegmentationTestDataset(CILRoadSegmentationDataset):
         index = index + TEST_DATASET_INDEX_OFFSET
         input_image = self.load_image(Path(self.input_data_folder,
                                             self.index_to_filename(index)))
+        input_image = input_image[:, :, 0:3] # Dropping fourth channel
+        
         # torchvision requires image in [0, 1) range for float dtype
         input_image = np.clip(input_image/255, a_min=0, a_max= 1 - 1e-7)
         return self.to_tensor(input_image).transpose(1, 2).transpose(0, 1)
