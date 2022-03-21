@@ -42,7 +42,7 @@ class SegVerticalFlip:
     def __call__(self, x, y):
         return TF.vflip(x), TF.vflip(y)
     
-class IndentityTransform:
+class IdentityTransform:
     def __init__(self, *args, **kwargs) -> None:
         #no attrs
         pass
@@ -60,12 +60,12 @@ class SegAdjustBrightness:
     def __call__(self, x, y):
         factor = random.choice(self.brightness_factors)
         return TF.adjust_brightness(x, brightness_factor=factor), y
-    
+
 
 default_transformations = {IdentityTransform(): 0.4,
                            SegHorizontalFlip(): 0.2,
                           SegVerticalFlip(): 0.2,
-                          SegAdjustBrightness(): 0.1}
+                          SegAdjustBrightness(): 0.2}
 
         
 class CILRoadSegmentationDataset(Dataset):
@@ -116,7 +116,6 @@ class CILRoadSegmentationDataset(Dataset):
         return self.num_samples
 
     def __getitem__(self, index: int):
-        print(self.image_names[index])
         input_image = self.load_image(os.path.join(self.images_path, self.image_names[index]))
         
         # torchvision requires image in [0, 1) range for float dtype
@@ -140,14 +139,55 @@ class CILRoadSegmentationDataset(Dataset):
             input_image, groundtruth = transform(input_image, groundtruth)
 
         return input_image[:3], groundtruth
+    
 
+def get_dataset(root_dir: str,
+                transformations = "default",
+                 image_folder = "images",
+                 label_folder = "groundtruth"
+                ):
+    
+    transformations = default_transformations if transformations=="default" else transformations if type(transformations) is dict else None
+    return CILRoadSegmentationDataset(root_dir="../data/training/",
+                                     transformations=transformations,
+                                    image_folder = image_folder,
+                                     label_folder = label_folder)
+
+def get_dataloader(root_dir: str,
+                                                  batch_size: int = 10,
+                               shuffle: bool =True,
+                transformations = "default",
+                 image_folder = "images",
+                 label_folder = "groundtruth"):
+    
+    dataset = get_dataset(root_dir, transformations, image_folder, label_folder)
+    
+    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
+    
+
+def get_train_test_dataloaders(root_dir: str,
+                               train_split: float = 0.8,
+                               batch_size: int = 10,
+                               shuffle: bool =True,
+                                transformations = "default",
+                                 image_folder = "images",
+                                 label_folder = "groundtruth"):
+    dataset = get_dataset(root_dir, transformations, image_folder, label_folder)
+    
+    train_set, test_set = torch.utils.data.random_split(dataset, [int(len(dataset)*train_split), len(dataset)-int(len(dataset)*train_split)])
+    
+    return torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=shuffle), torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=shuffle)
+    
+    
     
 """
  # Usage example
  
 from matplotlib import pyplot as plt
 
-dataset = CILRoadSegmentationDataset(root_dir="../data/training/")
+dataset = get_dataset("../data/training")
+dataloader = get_dataloader("../data/training")
+train_dataloader, test_dataloader = get_train_test_dataloaders("../data/training", train_split=0.8)
 
 x, y = dataset.__getitem__(1)
 
