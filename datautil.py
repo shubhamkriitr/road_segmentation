@@ -355,13 +355,13 @@ def dump_transformed_images(loader, data_transformer_class, root_output_dir,
         for j in range(x_.shape[0]):
             file_id = f"{pad_zeros(idx, 3)}_{pad_zeros(j, 3)}"
             orig_img_filename = os.path.join(root_output_dir, 
-                                        file_id + "_orig_img.png")
+                                        file_id + "_img_orig.png")
             orig_map_filename = os.path.join(root_output_dir, 
-                                            file_id + "_orig_map.png")
+                                            file_id + "_map_orig.png")
             aug_img_filename = os.path.join(root_output_dir, 
-                                            file_id + "_aug_img.png")
+                                            file_id + "_img_aug.png")
             aug_map_filename = os.path.join(root_output_dir, 
-                                            file_id + "_aug_map.png")
+                                            file_id + "_map_aug.png")
             
             plt.imsave(orig_img_filename, x_orig[j].numpy())
             plt.imsave(orig_map_filename, y_orig[j].numpy()[:, :, 0])
@@ -380,9 +380,10 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(train_dataset, batch_size=16, shuffle=False)
     test_dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False)
 
-
+    logger.info(f"Saving tranformed images...")
     dump_transformed_images(train_dataloader, SegmentationTrainingDataTransformer, 
                             "test_transforms", 6)
+    logger.info("Saved transformed images.")
     n1 = 2 
     n2 = 2
 
@@ -414,16 +415,16 @@ if __name__ == "__main__":
             plt.imshow(y[-1].numpy())
             plt.show()
 
-    for idx, batch_data in enumerate(test_dataloader):
-        if idx == n2:
-            break
-        x = batch_data
-        plt.imshow(x[0].numpy())
-        plt.show()
+    # for idx, batch_data in enumerate(test_dataloader):
+    #     if idx == n2:
+    #         break
+    #     x = batch_data
+    #     plt.imshow(x[0].numpy())
+    #     plt.show()
         
 
-        plt.imshow(x[-1].numpy())
-        plt.show()
+    #     plt.imshow(x[-1].numpy())
+    #     plt.show()
        
         
         
