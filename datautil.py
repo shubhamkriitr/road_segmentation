@@ -32,9 +32,10 @@ TEST_DATASET_INDEX_OFFSET = 144
 
 class CILRoadSegmentationDataset(Dataset):
 
-    def __init__(self, rootdir, *args, **kwargs) -> None:
+    def __init__(self, rootdir, index_offset=0, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
         self.rootdir = rootdir
+        self.index_offset = index_offset
         self.num_samples = 0
         self.input_data_folder = None
         self.groundtruth_output_data_folder = None
@@ -92,6 +93,7 @@ class CILRoadSegmentationDataset(Dataset):
 
 class CILRoadSegmentationTrainingDataset(CILRoadSegmentationDataset):
     def __init__(self, rootdir=DEFAULT_TRAINING_DATASET_ROOTDIR,
+                       index_offset=0,
                  *args, **kwargs) -> None:
         super().__init__(rootdir, *args, **kwargs)
         if self.groundtruth_output_data_folder is None:
@@ -106,6 +108,7 @@ class CILRoadSegmentationTrainingDataset(CILRoadSegmentationDataset):
         return self.num_samples
 
     def __getitem__(self, index: int):
+        index = index + self.index_offset
         input_image = self.load_image(  os.path.join(self.input_data_folder,
                                         self.index_to_filename(index)))
         input_image = input_image[:, :, 0:3] # Dropping fourth channel
@@ -146,6 +149,9 @@ class CILRoadSegmentationTestDataset(CILRoadSegmentationDataset):
         return self.to_tensor(input_image).transpose(1, 2).transpose(0, 1)
 
 
+
+
+
 # NOTE: https://pytorch.org/vision/stable/transforms.html
 # https://github.com/pytorch/vision/blob/main/references/segmentation/transforms.py
 
@@ -165,7 +171,7 @@ class SegmentationTrainingDataTransformer(BaseSegmentationDataTransformer):
 
     def __init__(self, config=None) -> None:
         self.default_config = {
-            "group_probs" : [0.5, 0.125, 0.125, 0.125, 0.125]
+            "group_probs" : [0.5, 0.125, 0.125, 0.125, 0.025, 0.1]
         }
         super().__init__(config=config) #self.config gets overridden by
         # `self.default_config` if `config` it is None
@@ -175,17 +181,20 @@ class SegmentationTrainingDataTransformer(BaseSegmentationDataTransformer):
             self.transfrom_group_a,
             self.transform_group_b,
             self.transform_group_c,
-            self.transform_group_d
+            self.transform_group_d,
+            self.transform_group_e
         ]
         self.group_probs = self.config["group_probs"]
         assert len(self.transformation_group_list) == len(self.group_probs)
         self.probability_threshold = self.get_probability_thresolds(
             self.group_probs)
 
+        # TODO: read spec from config and inject instance from outside
         self.rotation = SegRotationTransform()
         self.hflip = SegHorizontalFlip()
         self.vflip = SegVerticalFlip()
         self.brightness = SegAdjustBrightness()
+        self.affine = SegAffine()
     
     def identity_transform(self, input_, target):
         return input_, target
@@ -228,6 +237,9 @@ class SegmentationTrainingDataTransformer(BaseSegmentationDataTransformer):
     
     def transform_group_d(self, input_, target):
         return self.brightness(input_, target)
+    
+    def transform_group_e(self, input_, target):
+        return self.affine(input_, target)
 
     def register_transformation(self, transformation):
         # TODO: to be implemented if needed
@@ -267,7 +279,6 @@ class SegVerticalFlip:
 
 class SegAdjustBrightness:
     def __init__(self, brightness_factors=None) -> None:
-        #no attrs
         self.brightness_factors = brightness_factors
         if self.brightness_factors is None:
             self.brightness_factors = [0.5, 0.8, 1.2, 1.5]
@@ -276,7 +287,86 @@ class SegAdjustBrightness:
         factor = random.choice(self.brightness_factors)
         return TF.adjust_brightness(x, brightness_factor=factor), y
 
+
+class SegAffine:
+    def __init__(self, angle=None, translate=None, scale=None,
+                    shear=None) -> None:
+        #no attrs
+        self.angle = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 110, 120]
+        self.translate = [[0, 1]]
+        self.scale = [1.0, 1.2, 1.5, 0.8, 0.6]
+        self.shear = [[15, 0], [0, 15], [15, 15], [25, 0], [0, 25], [25, 25]]
+
+        if angle is not None:
+            self.angle = angle
+        if translate is not None:
+            self.translate = translate
+        if scale is not None:
+            self.scale = scale
+        if shear is not None:
+            self.shear = shear
+
+
+    def __call__(self, x, y):
+        angle = random.choice(self.angle)
+        translate = random.choice(self.translate)
+        scale = random.choice(self.scale)
+        shear = random.choice(self.shear)
+
+        return TF.affine(x, angle=angle,
+                translate=translate, scale=scale, shear=shear), \
+                    TF.affine(y, angle=angle, translate=translate,
+                     scale=scale, shear=shear)
+
+
+def pad_zeros(num: int, size):
+    num = str(num)
+    return "0"*(size - len(num)) + num
+
+
+
+def dump_transformed_images(loader, data_transformer_class, root_output_dir,
+                             num_transforms=6):
+    from matplotlib import pyplot as plt
+    # num_transforms = no. of transformation groups (identity included)
+    os.makedirs(root_output_dir, exist_ok=True)
+
+    for idx, batch_data in enumerate(train_dataloader):
         
+        if idx == num_transforms:
+            break
+        group_probs = [0]*num_transforms
+        group_probs[idx] = 1.0
+
+        data_aug = data_transformer_class(
+            config={
+                "group_probs" : group_probs
+            }
+        )
+        x_, y_ = batch_data
+        x_t, y_t = data_aug.transform(x_, y_)
+        x, y = torch.transpose(x_t, 1, 2).transpose(2, 3), \
+                     y_t.transpose(1, 2).transpose(2, 3)
+        
+        x_orig, y_orig = torch.transpose(x_, 1, 2).transpose(2, 3), \
+                     y_.transpose(1, 2).transpose(2, 3)
+        
+
+        for j in range(x_.shape[0]):
+            file_id = f"{pad_zeros(idx, 3)}_{pad_zeros(j, 3)}"
+            orig_img_filename = os.path.join(root_output_dir, 
+                                        file_id + "_orig_img.png")
+            orig_map_filename = os.path.join(root_output_dir, 
+                                            file_id + "_orig_map.png")
+            aug_img_filename = os.path.join(root_output_dir, 
+                                            file_id + "_aug_img.png")
+            aug_map_filename = os.path.join(root_output_dir, 
+                                            file_id + "_aug_map.png")
+            
+            plt.imsave(orig_img_filename, x_orig[j].numpy())
+            plt.imsave(orig_map_filename, y_orig[j].numpy()[:, :, 0])
+            plt.imsave(aug_img_filename, x[j].numpy())
+            plt.imsave(aug_map_filename, y[j].numpy()[:, :, 0])
 
 
 
@@ -290,6 +380,9 @@ if __name__ == "__main__":
     train_dataloader = DataLoader(train_dataset, batch_size=16, shuffle=False)
     test_dataloader = DataLoader(test_dataset, batch_size=16, shuffle=False)
 
+
+    dump_transformed_images(train_dataloader, SegmentationTrainingDataTransformer, 
+                            "test_transforms", 6)
     n1 = 2 
     n2 = 2
 
@@ -297,7 +390,7 @@ if __name__ == "__main__":
 
     data_aug = SegmentationTrainingDataTransformer(
         config={
-            "group_probs" : [ 0.0, 1.0, 0., 0., 0.] #[0.5, 0.125, 0.125, 0.125, 0.125]
+            "group_probs" : [ 0.0, 0.0, 0., 0., 0., 1.0] #[0.5, 0.125, 0.125, 0.125, 0.025, 0.1]
         }
     )
 
