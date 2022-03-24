@@ -6,8 +6,13 @@ import unet
 import torch
 import argparse
 
-def train(model: str,
-          model_config: dict,
+
+def get_model_from_name(model_name="unet", model_config={}):
+    if model_name == "unet":
+        return unet.UNet(**model_config)
+
+
+def train(model: torch.nn.Module,
           loss: callable,
           optimizer: callable,
           n_epochs: int,
@@ -17,11 +22,10 @@ def train(model: str,
           logs_save_path: str,
           save_freq: int = None,
           device: str = "cpu",
-          logging_freq = 100):
+          logging_freq=100):
     """
     Function used to call a model for the CIL project
-    :param model: string among the implemented models. Options: "unet"
-    :param model_config: dictionary containing the parameters for the model
+    :param model: Model to be trained
     :param loss: function used to compute the loss. Takes as input (prediction, target)
     :param optimizer: optimizer for the model from torch.optim
     :param n_epochs: number of epochs to train for
@@ -46,9 +50,7 @@ def train(model: str,
     # Define a summary writer for the logs
     writer = SummaryWriter(os.path.join(logs_save_path, run_id))
 
-    # Get model from its name
-    if model == "unet":
-        model = unet.UNet(**model_config).to(device)
+    model = model.to(device)
 
     # Training process
     optimizer = optimizer(model.parameters())
@@ -58,7 +60,7 @@ def train(model: str,
 
         for i, (inp, target) in enumerate(train_dataloader):
 
-            if epoch == 0 and i==0:
+            if epoch == 0 and i == 0:
                 writer.add_graph(model, inp)
 
             # move input to cuda if required
@@ -81,10 +83,10 @@ def train(model: str,
             epoch_loss += loss.item()
 
             if i % logging_freq == 0:
-                print(f"Epoch {epoch+1}/{n_epochs} | Batch {i}/{len(train_dataloader)} => Running epoch loss per sample: {epoch_loss/(logging_freq*train_dataloader.batch_size)}")
+                print(f"Epoch {epoch + 1}/{n_epochs} | Batch {i}/{len(train_dataloader)} => Running epoch loss per sample: {epoch_loss / (logging_freq * train_dataloader.batch_size)}")
 
         # Log the loss
-        writer.add_scalar("Loss/train", epoch_loss/len(train_dataloader.dataset), epoch)
+        writer.add_scalar("Loss/train", epoch_loss / len(train_dataloader.dataset), epoch)
 
         # Store model
         if save_freq is not None and ((epoch + 1) % save_freq == 0 or epoch + 1 == n_epochs):
@@ -110,6 +112,6 @@ def train(model: str,
                     eval_loss += loss.item()
 
                 writer.add_scalar("Loss/eval", eval_loss / len(test_dataloader.dataset), epoch)
-                print(f"Evaluation loss after epoch {epoch+1}/{n_epochs}: {eval_loss / len(test_dataloader.dataset)}")
+                print(f"Evaluation loss after epoch {epoch + 1}/{n_epochs}: {eval_loss / len(test_dataloader.dataset)}")
 
         writer.flush()
