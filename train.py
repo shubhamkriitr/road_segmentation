@@ -90,7 +90,7 @@ def train(model: torch.nn.Module,
         # Store model
         if save_freq is not None and ((epoch + 1) % save_freq == 0 or epoch + 1 == n_epochs):
             checkpoint_name = f"{run_id}_epoch{epoch + 1}"
-            checkpoint_path = f"./model/{checkpoint_name}.pkl"
+            checkpoint_path = os.path.join(model_save_path, f"{checkpoint_name}.pkl")
             print(f"Saving model to {checkpoint_path}")
             torch.save(model, checkpoint_path)
 
