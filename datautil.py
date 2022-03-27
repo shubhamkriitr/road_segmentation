@@ -133,6 +133,9 @@ class CILRoadSegmentationDataset(Dataset):
         input_image = self.to_tensor(input_image).transpose(1, 2).transpose(0, 1)
         groundtruth = self.to_tensor(groundtruth).unsqueeze(0) if groundtruth is not None else None
         
+        # remove unnecessary dim
+        input_image = input_image[:3]
+        
         if self.transformations and self.labels_path:
             # Get transform according to probabilities
             transform = np.random.choice(list(self.transformations.keys()), size=1, p=list(self.transformations.values()))[0]
@@ -148,7 +151,7 @@ def get_dataset(root_dir: str,
                 ):
     
     transformations = default_transformations if transformations=="default" else transformations if type(transformations) is dict else None
-    return CILRoadSegmentationDataset(root_dir="../data/training/",
+    return CILRoadSegmentationDataset(root_dir=root_dir,
                                      transformations=transformations,
                                     image_folder = image_folder,
                                      label_folder = label_folder)
