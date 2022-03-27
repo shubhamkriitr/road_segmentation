@@ -53,7 +53,6 @@ def train(model: torch.nn.Module,
     model = model.to(device)
 
     # Training process
-    optimizer = optimizer(model.parameters())
     for epoch in range(n_epochs):
         epoch_loss = 0
         model.train()
