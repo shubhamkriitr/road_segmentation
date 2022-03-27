@@ -125,13 +125,13 @@ class CILRoadSegmentationDataset(Dataset):
             groundtruth = self.load_image(os.path.join(self.labels_path, self.image_names[index]))
 
             # NOTE: creating probability map from the ground truth image
-            groundtruth = groundtruth//255
+            groundtruth = torch.tensor(groundtruth)/255
+            groundtruth = torch.stack([groundtruth, 1 - groundtruth], dim=0)
         else:
             groundtruth = None
         
         # To tensors
         input_image = self.to_tensor(input_image).transpose(1, 2).transpose(0, 1)
-        groundtruth = self.to_tensor(groundtruth).unsqueeze(0) if groundtruth is not None else None
         
         # remove unnecessary dim
         input_image = input_image[:3]

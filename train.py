@@ -59,13 +59,13 @@ def train(model: torch.nn.Module,
 
         for i, (inp, target) in enumerate(train_dataloader):
 
-            if epoch == 0 and i == 0:
-                writer.add_graph(model, inp)
-
             # move input to cuda if required
             if device == "cuda":
                 inp = inp.cuda(non_blocking=True)
                 target = target.cuda(non_blocking=True)
+
+            if epoch == 0 and i == 0:
+                writer.add_graph(model, inp)
 
             # forward pass
             pred = model.forward(inp)
