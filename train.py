@@ -13,7 +13,7 @@ def get_model_from_name(model_name="unet", model_config={}):
 
 
 def train(model: torch.nn.Module,
-          loss: callable,
+          loss_fn: callable,
           optimizer: callable,
           n_epochs: int,
           train_dataloader: DataLoader,
@@ -69,7 +69,7 @@ def train(model: torch.nn.Module,
 
             # forward pass
             pred = model.forward(inp)
-            loss = loss(pred, target)
+            loss = loss_fn(pred, target)
 
             # compute the gradients
             optimizer.zero_grad()
@@ -107,7 +107,7 @@ def train(model: torch.nn.Module,
 
                     # forward pass
                     pred = model.forward(inp)
-                    loss = loss(pred, target)
+                    loss = loss_fn(pred, target)
                     eval_loss += loss.item()
 
                 writer.add_scalar("Loss/eval", eval_loss / len(test_dataloader.dataset), epoch)
