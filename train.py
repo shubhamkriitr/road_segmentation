@@ -5,6 +5,8 @@ from torch.utils.tensorboard import SummaryWriter
 import unet
 import torch
 import argparse
+from datautil import *
+from cost_functions import *
 
 
 def get_model_from_name(model_name="unet", model_config={}):
@@ -114,3 +116,36 @@ def train(model: torch.nn.Module,
                 print(f"Evaluation loss after epoch {epoch + 1}/{n_epochs}: {eval_loss / len(test_dataloader.dataset)}")
 
         writer.flush()
+
+    return model
+
+
+if __name__ == "__main__":
+
+    train_data_path = None
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    assert train_data_path is not None, "Please specify the path to the training data"
+
+    train_dataloader, test_dataloader = get_train_test_dataloaders(train_data_path, train_split=0.8)
+
+    # Define the model
+    model = get_model_from_name(model_name="unet")
+
+    # Define the optimizer
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+    # Choose a loss
+    loss = torch.nn.CrossEntropyLoss()
+
+    model = train(model,
+                  loss_fn=loss,
+                  optimizer=optimizer,
+                  n_epochs=20,
+                  train_dataloader=train_dataloader,
+                  test_dataloader=test_dataloader,
+                  model_save_path="drive/MyDrive/ETH/CIL/data/checkpoints/unet",
+                  logs_save_path="drive/MyDrive/ETH/CIL/data/checkpoints/unet",
+                  save_freq=None,
+                  logging_freq=10,
+                  device=device)
+
