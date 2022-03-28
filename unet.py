@@ -104,7 +104,7 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     model = train(model,
-                  loss_fn=dsc_loss,
+                  loss_fn=torch.nn.CrossEntropyLoss(),
                   optimizer=optimizer,
                   n_epochs=20,
                   train_dataloader=train_dataloader,
