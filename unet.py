@@ -98,6 +98,7 @@ class UNet(torch.nn.Module):
 
 
 if __name__ == "__main__":
+    print("You should probably use train.py instead :)")
     train_dataloader, test_dataloader = get_train_test_dataloaders("drive/MyDrive/ETH/CIL/data/training", train_split=0.8)
 
     model = UNet()
