@@ -5,11 +5,16 @@ import torch
 import argparse
 from datautil import *
 from cost_functions import *
+import baseline_unet
 
 
 def get_model_from_name(model_name="unet", model_config={}):
     if model_name == "unet":
         return unet.UNet(**model_config)
+    elif model_name == "baseline_unet":
+        return baseline_unet.BaselineUNet(**model_config)
+    else:
+        raise Exception("Model name not recognized. You should use one of the following: unet, baseline_unet")
 
 
 def train(model: torch.nn.Module,
