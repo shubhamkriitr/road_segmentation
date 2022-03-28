@@ -6,12 +6,11 @@ from datetime import datetime
 
 import os
 from datautil import *
-from train import train
+#from train import train
 
 torch.manual_seed(42)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"will train on {device}")
 
 class UNetLevel(torch.nn.Module):
     def __init__(self, layers, dim_coef, in_channels, out_channels):
@@ -97,26 +96,26 @@ class UNet(torch.nn.Module):
         return x
 
 
-if __name__ == "__main__":
-    train_dataloader, test_dataloader = get_train_test_dataloaders("drive/MyDrive/ETH/CIL/data/training", train_split=0.8)
-
-    model = UNet()
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-
-    model = train(model,
-                  loss_fn=torch.nn.CrossEntropyLoss(),
-                  optimizer=optimizer,
-                  n_epochs=20,
-                  train_dataloader=train_dataloader,
-                  test_dataloader=test_dataloader,
-                  model_save_path="drive/MyDrive/ETH/CIL/data/checkpoints/unet",
-                  logs_save_path="drive/MyDrive/ETH/CIL/data/checkpoints/unet",
-                  save_freq=None,
-                  logging_freq=10,
-                  device='cuda')
-
-    test_image, test_target = test_dataloader.dataset[3]
-    pred = model(test_image)[0]
-    pred = pred.round()
-
-    imageio.imwrite("./output_mask.png", pred)
+#if __name__ == "__main__":
+#    train_dataloader, test_dataloader = get_train_test_dataloaders("./data/training", train_split=0.8)
+#
+#    model = UNet()
+#    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+#
+#    model = train(model,
+#                  loss_fn=torch.nn.CrossEntropyLoss(),
+#                  optimizer=optimizer,
+#                  n_epochs=20,
+#                  train_dataloader=train_dataloader,
+#                  test_dataloader=test_dataloader,
+#                  model_save_path="./data/checkpoints/unet",
+#                  logs_save_path="./data/checkpoints/unet",
+#                  save_freq=None,
+#                  logging_freq=10,
+#                  device='cuda')
+#
+#    test_image, test_target = test_dataloader.dataset[3]
+#    pred = model(test_image)[0]
+#    pred = pred.round()
+#
+#    imageio.imwrite("./output_mask.png", pred)
