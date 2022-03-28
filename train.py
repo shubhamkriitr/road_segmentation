@@ -122,8 +122,12 @@ def train(model: torch.nn.Module,
 
 if __name__ == "__main__":
 
-    train_data_path = None
     device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # Define the paths
+    train_data_path = None
+    model_save_path = None
+    logs_save_path = None
     assert train_data_path is not None, "Please specify the path to the training data"
 
     train_dataloader, test_dataloader = get_train_test_dataloaders(train_data_path, train_split=0.8)
@@ -143,8 +147,8 @@ if __name__ == "__main__":
                   n_epochs=20,
                   train_dataloader=train_dataloader,
                   test_dataloader=test_dataloader,
-                  model_save_path="drive/MyDrive/ETH/CIL/data/checkpoints/unet",
-                  logs_save_path="drive/MyDrive/ETH/CIL/data/checkpoints/unet",
+                  model_save_path=model_save_path,
+                  logs_save_path=logs_save_path,
                   save_freq=None,
                   logging_freq=10,
                   device=device)
