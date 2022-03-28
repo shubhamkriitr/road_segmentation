@@ -5,7 +5,8 @@ import collections
 from datetime import datetime
 
 import os
-import imageio
+from datautil import *
+from train import train
 
 torch.manual_seed(42)
 
@@ -96,15 +97,26 @@ class UNet(torch.nn.Module):
         return x
 
 
-img_dir, groundtruth_dir = "./data/training/images", "./data/training/groundtruth"
-train_dataset, dev_dataset = Dataset(img_dir, groundtruth_dir, 10, None), Dataset(img_dir, groundtruth_dir, 0, 10)
-train_data, dev_data = [torch.utils.data.DataLoader(dataset, batch_size=10, shuffle=True) for dataset in (train_dataset, dev_dataset)]
+if __name__ == "__main__":
+    train_dataloader, test_dataloader = get_train_test_dataloaders("drive/MyDrive/ETH/CIL/data/training", train_split=0.8)
 
-epochs = 100
-unet = UNet().to(device)
-unet.custom_train(train_data, dev_data, epochs, save_freq=10)
+    model = UNet()
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-pred = unet(torch.stack([train_dataset[0][0]]))[0]
-pred = torch.where(pred[0] >= pred[1], 255 * torch.ones_like(pred[0]), torch.zeros_like(pred[0])).to(torch.uint8)
+    model = train(model,
+                  loss_fn=dsc_loss,
+                  optimizer=optimizer,
+                  n_epochs=20,
+                  train_dataloader=train_dataloader,
+                  test_dataloader=test_dataloader,
+                  model_save_path="drive/MyDrive/ETH/CIL/data/checkpoints/unet",
+                  logs_save_path="drive/MyDrive/ETH/CIL/data/checkpoints/unet",
+                  save_freq=None,
+                  logging_freq=10,
+                  device='cuda')
 
-imageio.imwrite("./output_mask.png", pred)
+    test_image, test_target = test_dataloader.dataset[3]
+    pred = model(test_image)[0]
+    pred = pred.round()
+
+    imageio.imwrite("./output_mask.png", pred)
