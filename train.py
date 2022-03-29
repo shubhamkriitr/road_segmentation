@@ -6,7 +6,7 @@ import argparse
 from datautil import *
 from cost_functions import *
 import baseline_unet
-
+from torchmetrics import F1Score
 
 def get_model_from_name(model_name="unet", model_config={}):
     if model_name == "unet":
@@ -15,7 +15,6 @@ def get_model_from_name(model_name="unet", model_config={}):
         return baseline_unet.BaselineUNet(**model_config)
     else:
         raise Exception("Model name not recognized. You should use one of the following: unet, baseline_unet")
-
 
 def train(model: torch.nn.Module,
           loss_fn: callable,
@@ -58,6 +57,8 @@ def train(model: torch.nn.Module,
     model = model.to(device)
 
     # Training process
+    f1_score = F1Score()
+
     for epoch in range(n_epochs):
         epoch_loss = 0
         model.train()
@@ -104,6 +105,9 @@ def train(model: torch.nn.Module,
             eval_loss = 0.
 
             with torch.no_grad():
+                predictions = []
+                targets = []
+
                 for i, (inp, target) in enumerate(test_dataloader):
                     # move input to cuda if required
                     if device == "cuda":
@@ -114,9 +118,15 @@ def train(model: torch.nn.Module,
                     pred = model.forward(inp)
                     loss = loss_fn(pred, target)
                     eval_loss += loss.item()
+                    predictions.append(pred)
+                    targets.append(target)
+
+                targets = torch.cat(targets, axis=0)
+                predictions = torch.cat(predictions, axis=0)
 
                 writer.add_scalar("Loss/eval", eval_loss / len(test_dataloader.dataset), epoch)
                 print(f"Evaluation loss after epoch {epoch + 1}/{n_epochs}: {eval_loss / len(test_dataloader.dataset)}")
+                print(f"F1-Score after epoch {epoch + 1}/{n_epochs}: {f1_score(predictions.to('cpu'), targets.int().to('cpu'))}")
 
         writer.flush()
 
