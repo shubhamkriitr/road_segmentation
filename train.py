@@ -8,6 +8,13 @@ from cost_functions import *
 import baseline_unet
 from torchmetrics import F1Score
 
+parser = argparse.ArgumentParser()
+
+parser.add_argument("--data", default=None, type=str, help="path to training data")
+parser.add_argument("--savedir", default=None, type=str, help="path for saving checkpoints")
+parser.add_argument("--logdir", default=None, type=str, help="path for writing tensorboard logs")
+parser.add_argument("--model", default="unet", type=str, help="what type of model should be trained (e.g. unet)")
+
 def get_model_from_name(model_name="unet", model_config={}):
     if model_name == "unet":
         return unet.UNet(**model_config)
@@ -133,20 +140,16 @@ def train(model: torch.nn.Module,
     return model
 
 
-if __name__ == "__main__":
-
+def main(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Define the paths
-    train_data_path = None
-    model_save_path = None
-    logs_save_path = None
-    assert train_data_path is not None, "Please specify the path to the training data"
+    assert args.data is not None, "Please specify the path to the training data"
 
-    train_dataloader, test_dataloader = get_train_test_dataloaders(train_data_path, train_split=0.8)
+    train_dataloader, test_dataloader = get_train_test_dataloaders(args.data, train_split=0.8)
 
     # Define the model
-    model = get_model_from_name(model_name="unet")
+    model = get_model_from_name(model_name=args.model)
 
     # Define the optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
@@ -160,9 +163,12 @@ if __name__ == "__main__":
                   n_epochs=20,
                   train_dataloader=train_dataloader,
                   test_dataloader=test_dataloader,
-                  model_save_path=model_save_path,
-                  logs_save_path=logs_save_path,
+                  model_save_path=args.savedir,
+                  logs_save_path=args.logdir,
                   save_freq=None,
                   logging_freq=10,
                   device=device)
 
+if __name__ == "__main__":
+    args = parser.parse_args()
+    main(args)
