@@ -93,4 +93,4 @@ class UNet(torch.nn.Module):
         outs.reverse()
         x = self.decoder(x, outs)
         x = self.decoder_top(x)
-        return x
+        return x[:, :1]

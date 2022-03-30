@@ -133,7 +133,7 @@ def train(model: torch.nn.Module,
 
                 writer.add_scalar("Loss/eval", eval_loss / len(test_dataloader.dataset), epoch)
                 print(f"Evaluation loss after epoch {epoch + 1}/{n_epochs}: {eval_loss / len(test_dataloader.dataset)}")
-                print(f"F1-Score after epoch {epoch + 1}/{n_epochs}: {f1_score(predictions.to('cpu'), targets.int().to('cpu'))}")
+                print(f"F1-Score after epoch {epoch + 1}/{n_epochs}: {f1_score(predictions.to('cpu'), targets.int().to('cpu')[:, 0])}")
 
         writer.flush()
 
@@ -155,7 +155,7 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     # Choose a loss
-    loss = torch.nn.CrossEntropyLoss()
+    loss = BinaryGeneralizeDiceLoss()
 
     model = train(model,
                   loss_fn=loss,
