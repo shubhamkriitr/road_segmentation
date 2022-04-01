@@ -92,5 +92,5 @@ class UNet(torch.nn.Module):
         outs.pop(-1) #no resisual connection from the last encoder level
         outs.reverse()
         x = self.decoder(x, outs)
-        x = self.decoder_top(x)
+        x = torch.softmax(self.decoder_top(x), dim=1)
         return x[:, :1]

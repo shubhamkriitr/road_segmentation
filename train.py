@@ -7,13 +7,20 @@ from datautil import *
 from cost_functions import *
 import baseline_unet
 from torchmetrics import F1Score
+import imageio
 
 parser = argparse.ArgumentParser()
 
-parser.add_argument("--data", default=None, type=str, help="path to training data")
-parser.add_argument("--savedir", default=None, type=str, help="path for saving checkpoints")
-parser.add_argument("--logdir", default=None, type=str, help="path for writing tensorboard logs")
-parser.add_argument("--model", default="unet", type=str, help="what type of model should be trained (e.g. unet)")
+parser.add_argument("--data", "-d", default=None, type=str, help="path to training data")
+parser.add_argument("--savedir", "-s", default=None, type=str, help="path for saving checkpoints")
+parser.add_argument("--logdir", "-l", default=None, type=str, help="path for writing tensorboard logs")
+parser.add_argument("--model", "-m", default="unet", type=str, help="what type of model should be trained (e.g. unet)")
+parser.add_argument(
+    "--save_images",
+    "-i",
+    action="store_true",
+    help="flag specifying that dev data predictions should be saved to .png images"
+)
 
 def get_model_from_name(model_name="unet", model_config={}):
     if model_name == "unet":
@@ -139,6 +146,29 @@ def train(model: torch.nn.Module,
 
     return model
 
+def write_images(model, dataloader, path, threshold=0.2):
+    if not os.path.exists(path): os.makedirs(path)
+    for b, (x, y) in enumerate(dataloader):
+        pred = None
+        with torch.no_grad():
+            pred = model(x.cuda()).cpu()
+        thresholded = torch.where(pred >= threshold, torch.ones_like(pred), torch.zeros_like(pred)).numpy()
+        pred = pred.numpy()
+        y = y.cpu().numpy()[:, :1]
+        assert pred.shape == y.shape
+        for i in range(pred.shape[0]):
+            imageio.imwrite(f"{path}/{b}-{i}.png", (pred[i, 0]*255).astype(np.uint8))
+            imageio.imwrite(f"{path}/{b}-{i}_thresholded.png", (thresholded[i, 0]*255).astype(np.uint8))
+            imageio.imwrite(f"{path}/{b}-{i}_label.png", (y[i, 0]*255).astype(np.uint8))
+
+# TODO: move weighed BCE to cost_functions.py or remove?
+base_bce = torch.nn.BCELoss(reduction='none')
+def weighted_BCELoss(y_pred, y_true):
+    y_true = y_true[:, :1]
+    int_loss = base_bce(y_pred, y_true)
+    pred_round = y_pred.detach().round()
+    weights = torch.where((pred_round==0) & (y_true==1), 5, 1)
+    return torch.mean(weights*int_loss)
 
 def main(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -155,12 +185,12 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     # Choose a loss
-    loss = BinaryGeneralizeDiceLoss()
+    loss = weighted_BCELoss
 
     model = train(model,
                   loss_fn=loss,
                   optimizer=optimizer,
-                  n_epochs=20,
+                  n_epochs=100,
                   train_dataloader=train_dataloader,
                   test_dataloader=test_dataloader,
                   model_save_path=args.savedir,
@@ -168,6 +198,10 @@ def main(args):
                   save_freq=None,
                   logging_freq=10,
                   device=device)
+
+    if args.save_images:
+        write_images(model, train_dataloader, "./images/train")
+        write_images(model, test_dataloader, "./images/dev")
 
 if __name__ == "__main__":
     args = parser.parse_args()
