@@ -6,6 +6,7 @@ import argparse
 from datautil import *
 from cost_functions import *
 import baseline_unet
+import efficient_unet
 from torchmetrics import F1Score
 import imageio
 
@@ -21,12 +22,15 @@ parser.add_argument(
     action="store_true",
     help="flag specifying that dev data predictions should be saved to .png images"
 )
+parser.add_argument("--threshold", default=0.5, type=float, help="probability threshold for being marked as a road")
 
 def get_model_from_name(model_name="unet", model_config={}):
     if model_name == "unet":
         return unet.UNet(**model_config)
     elif model_name == "baseline_unet":
         return baseline_unet.BaselineUNet(**model_config)
+    elif model_name == "efficient_unet":
+        return efficient_unet.EfficientUNet()
     else:
         raise Exception("Model name not recognized. You should use one of the following: unet, baseline_unet")
 
@@ -40,7 +44,9 @@ def train(model: torch.nn.Module,
           logs_save_path: str,
           save_freq: int = None,
           device: str = "cpu",
-          logging_freq=100):
+          logging_freq=100,
+          initial_epochs=0,
+          threshold=0.5):
     """
     Function used to call a model for the CIL project
     :param model: Model to be trained
@@ -71,11 +77,13 @@ def train(model: torch.nn.Module,
     model = model.to(device)
 
     # Training process
-    f1_score = F1Score()
+    f1_score = F1Score(threshold=threshold)
 
     for epoch in range(n_epochs):
         epoch_loss = 0
         model.train()
+        if epoch >= initial_epochs and type(model) == efficient_unet.EfficientUNet:
+            model.update_enet = True
 
         for i, (inp, target) in enumerate(train_dataloader):
 
@@ -137,16 +145,18 @@ def train(model: torch.nn.Module,
 
                 targets = torch.cat(targets, axis=0)
                 predictions = torch.cat(predictions, axis=0)
+                f1_value = f1_score(predictions.to('cpu'), targets.int().to('cpu')[:, 0])
 
                 writer.add_scalar("Loss/eval", eval_loss / len(test_dataloader.dataset), epoch)
+                writer.add_scalar("F1", f1_value, epoch)
                 print(f"Evaluation loss after epoch {epoch + 1}/{n_epochs}: {eval_loss / len(test_dataloader.dataset)}")
-                print(f"F1-Score after epoch {epoch + 1}/{n_epochs}: {f1_score(predictions.to('cpu'), targets.int().to('cpu')[:, 0])}")
+                print(f"F1-Score after epoch {epoch + 1}/{n_epochs}: {f1_value}")
 
         writer.flush()
 
     return model
 
-def write_images(model, dataloader, path, threshold=0.2):
+def write_images(model, dataloader, path, threshold):
     if not os.path.exists(path): os.makedirs(path)
     for b, (x, y) in enumerate(dataloader):
         pred = None
@@ -197,11 +207,13 @@ def main(args):
                   logs_save_path=args.logdir,
                   save_freq=None,
                   logging_freq=10,
-                  device=device)
+                  device=device,
+                  initial_epochs=20,
+                  threshold=args.threshold)
 
     if args.save_images:
-        write_images(model, train_dataloader, "./images/train")
-        write_images(model, test_dataloader, "./images/dev")
+        write_images(model, train_dataloader, "./images/train", args.threshold)
+        write_images(model, test_dataloader, "./images/dev", args.threshold)
 
 if __name__ == "__main__":
     args = parser.parse_args()
