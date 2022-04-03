@@ -4,3 +4,4 @@ setuptools==59.5.0
 tensorboard
 torchmetrics
 torchvision
+loguru
