@@ -6,6 +6,7 @@ import logging
 from torch import nn
 import torch.functional as F
 from loggingutil import logger
+import commonutil
 
 PRETAINED_MODEL_PATHS = {
     "torchvision": {
@@ -14,16 +15,8 @@ PRETAINED_MODEL_PATHS = {
 }
 # >>> resnet50 = tvm.resnet50(pretrained=True, progress=True)
 
-def get_pruned_resnet_50 (load_strictly=False):
-    model_weights_path = PRETAINED_MODEL_PATHS["torchvision"]["resnet50"]
-    logger.debug(f"Loadin weights from : {model_weights_path}")
-    state_dict = torch.load(model_weights_path)
-    model = PrunedResnet50()
-    missing_keys, unexpected_keys \
-        = model.load_state_dict(state_dict=state_dict, strict=load_strictly)
-    logger.debug(f"Missing Keys: {missing_keys}")
-    logger.debug(f"Unexpected Keys: {unexpected_keys}")
-    return model
+
+
 
 class PrunedResnet50(ResNet):
     def __init__(self) -> None:
@@ -100,6 +93,63 @@ class PrunedResnet50(ResNet):
             nn.BatchNorm2d(num_features=out_channels),
             nn.ReLU()
         )
-    
-        
 
+
+class FrozenPrunedResnet50(PrunedResnet50):
+    """Same as PrunedResnet50 but with frozen ResNet weights.
+    Note: load_state_dict must be called for freezing the weights
+    """
+    def __init__(self) -> None:
+        super().__init__()
+    
+    def load_state_dict(self, state_dict,
+                        strict = True):
+        # load all the params
+        loading_key_info = super().load_state_dict(state_dict, strict)
+        
+        # now freeze the weights
+        self._freeze_weights()
+        
+        return loading_key_info
+    
+    def _freeze_weights(self):
+        for name, param in self.named_parameters():
+            if self._should_freeze(name):
+                param.requires_grad = False
+    
+    def _should_freeze(self, name: str):
+        if name.startswith("layer"):
+            return True
+        if name.startswith("conv1"):
+            return True
+        if name.startswith("bn1"):
+            return True
+        
+        return False
+        
+            
+    
+# TODO: add in model factory once decided we are using tht
+def model_getter ( model_class, load_strictly=False):
+    def _getter():
+        model_weights_path = PRETAINED_MODEL_PATHS["torchvision"]["resnet50"]
+        logger.debug(f"Loadin weights from : {model_weights_path}")
+        state_dict = torch.load(model_weights_path)
+        model = model_class()
+        missing_keys, unexpected_keys \
+            = model.load_state_dict(state_dict=state_dict, strict=load_strictly)
+        logger.debug(f"Missing Keys: {missing_keys}")
+        logger.debug(f"Unexpected Keys: {unexpected_keys}")
+        
+        frozen_params, trainable_params\
+            = commonutil.group_param_names_by_trainability(model)
+        
+        logger.info(f"Frozen parameters: {frozen_params}")
+        logger.info(f"Trainable parameters: {trainable_params}")
+        
+        return model
+    
+    return _getter
+
+get_pruned_resnet50 = model_getter(PrunedResnet50, False)
+get_frozen_pruned_resnet50 = model_getter(FrozenPrunedResnet50, False)
