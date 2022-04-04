@@ -6,13 +6,31 @@ import argparse
 from datautil import *
 from cost_functions import *
 import baseline_unet
+import efficient_unet
 from torchmetrics import F1Score
+import imageio
+
+parser = argparse.ArgumentParser()
+
+parser.add_argument("--data", "-d", default=None, type=str, help="path to training data")
+parser.add_argument("--savedir", "-s", default=None, type=str, help="path for saving checkpoints")
+parser.add_argument("--logdir", "-l", default=None, type=str, help="path for writing tensorboard logs")
+parser.add_argument("--model", "-m", default="unet", type=str, help="what type of model should be trained (e.g. unet)")
+parser.add_argument(
+    "--save_images",
+    "-i",
+    action="store_true",
+    help="flag specifying that dev data predictions should be saved to .png images"
+)
+parser.add_argument("--threshold", default=0.5, type=float, help="probability threshold for being marked as a road")
 
 def get_model_from_name(model_name="unet", model_config={}):
     if model_name == "unet":
         return unet.UNet(**model_config)
     elif model_name == "baseline_unet":
         return baseline_unet.BaselineUNet(**model_config)
+    elif model_name == "efficient_unet":
+        return efficient_unet.EfficientUNet()
     else:
         raise Exception("Model name not recognized. You should use one of the following: unet, baseline_unet")
 
@@ -26,7 +44,9 @@ def train(model: torch.nn.Module,
           logs_save_path: str,
           save_freq: int = None,
           device: str = "cpu",
-          logging_freq=100):
+          logging_freq=100,
+          initial_epochs=0,
+          threshold=0.5):
     """
     Function used to call a model for the CIL project
     :param model: Model to be trained
@@ -57,11 +77,13 @@ def train(model: torch.nn.Module,
     model = model.to(device)
 
     # Training process
-    f1_score = F1Score()
+    f1_score = F1Score(threshold=threshold)
 
     for epoch in range(n_epochs):
         epoch_loss = 0
         model.train()
+        if epoch >= initial_epochs and type(model) == efficient_unet.EfficientUNet:
+            model.update_enet = True
 
         for i, (inp, target) in enumerate(train_dataloader):
 
@@ -123,46 +145,76 @@ def train(model: torch.nn.Module,
 
                 targets = torch.cat(targets, axis=0)
                 predictions = torch.cat(predictions, axis=0)
+                f1_value = f1_score(predictions.to('cpu'), targets.int().to('cpu')[:, 0])
 
                 writer.add_scalar("Loss/eval", eval_loss / len(test_dataloader.dataset), epoch)
+                writer.add_scalar("F1", f1_value, epoch)
                 print(f"Evaluation loss after epoch {epoch + 1}/{n_epochs}: {eval_loss / len(test_dataloader.dataset)}")
-                print(f"F1-Score after epoch {epoch + 1}/{n_epochs}: {f1_score(predictions.to('cpu'), targets.int().to('cpu'))}")
+                print(f"F1-Score after epoch {epoch + 1}/{n_epochs}: {f1_value}")
 
         writer.flush()
 
     return model
 
+def write_images(model, dataloader, path, threshold):
+    if not os.path.exists(path): os.makedirs(path)
+    for b, (x, y) in enumerate(dataloader):
+        pred = None
+        with torch.no_grad():
+            pred = model(x.cuda()).cpu()
+        thresholded = torch.where(pred >= threshold, torch.ones_like(pred), torch.zeros_like(pred)).numpy()
+        pred = pred.numpy()
+        y = y.cpu().numpy()[:, :1]
+        assert pred.shape == y.shape
+        for i in range(pred.shape[0]):
+            imageio.imwrite(f"{path}/{b}-{i}.png", (pred[i, 0]*255).astype(np.uint8))
+            imageio.imwrite(f"{path}/{b}-{i}_thresholded.png", (thresholded[i, 0]*255).astype(np.uint8))
+            imageio.imwrite(f"{path}/{b}-{i}_label.png", (y[i, 0]*255).astype(np.uint8))
 
-if __name__ == "__main__":
+# TODO: move weighed BCE to cost_functions.py or remove?
+base_bce = torch.nn.BCELoss(reduction='none')
+def weighted_BCELoss(y_pred, y_true):
+    y_true = y_true[:, :1]
+    int_loss = base_bce(y_pred, y_true)
+    pred_round = y_pred.detach().round()
+    weights = torch.where((pred_round==0) & (y_true==1), 5, 1)
+    return torch.mean(weights*int_loss)
 
+def main(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
     # Define the paths
-    train_data_path = None
-    model_save_path = None
-    logs_save_path = None
-    assert train_data_path is not None, "Please specify the path to the training data"
+    assert args.data is not None, "Please specify the path to the training data"
 
-    train_dataloader, test_dataloader = get_train_test_dataloaders(train_data_path, train_split=0.8)
+    train_dataloader, test_dataloader = get_train_test_dataloaders(args.data, train_split=0.8)
 
     # Define the model
-    model = get_model_from_name(model_name="unet")
+    model = get_model_from_name(model_name=args.model)
 
     # Define the optimizer
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     # Choose a loss
-    loss = torch.nn.CrossEntropyLoss()
+    loss = weighted_BCELoss
 
     model = train(model,
                   loss_fn=loss,
                   optimizer=optimizer,
-                  n_epochs=20,
+                  n_epochs=100,
                   train_dataloader=train_dataloader,
                   test_dataloader=test_dataloader,
-                  model_save_path=model_save_path,
-                  logs_save_path=logs_save_path,
+                  model_save_path=args.savedir,
+                  logs_save_path=args.logdir,
                   save_freq=None,
                   logging_freq=10,
-                  device=device)
+                  device=device,
+                  initial_epochs=20,
+                  threshold=args.threshold)
 
+    if args.save_images:
+        write_images(model, train_dataloader, "./images/train", args.threshold)
+        write_images(model, test_dataloader, "./images/dev", args.threshold)
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+    main(args)
