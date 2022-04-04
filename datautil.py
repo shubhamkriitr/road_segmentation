@@ -23,7 +23,7 @@ class SegRotationTransform:
     def __init__(self, angles=None):
         self.angles = angles
         if self.angles is None:
-            self.angles = [30, 60, 90, 120, 180]
+            self.angles = [90, 180, -90, -180]
 
     def __call__(self, x, y):
         angle = random.choice(self.angles)
@@ -86,13 +86,15 @@ class SegGaussianBlur:
         return TF.gaussian_blur(x, kernel_size=(5, 9), sigma=(0.1, 5)), y
 
 
-default_base_transformations = {IdentityTransform(): 0.34,
-                                SegHorizontalFlip(): 0.33,
-                                SegVerticalFlip(): 0.33}
+default_base_transformations = {IdentityTransform(): 0.25,
+                                SegHorizontalFlip(): 0.25,
+                                SegVerticalFlip(): 0.25,
+                                SegRotationTransform(): 0.25}
 
-default_additional_transformations = {IdentityTransform(): 0.55,
+default_additional_transformations = {IdentityTransform(): 0.30,
+                                    SegRotationTransform(): 0.25,
                                       SegAdjustBrightness(): 0.15,
-                                      SegGaussianBlur(): 0.15,
+                                      SegGaussianBlur(): 0.05,
                                       SegAdjustContrast(): 0.15}
 
 
