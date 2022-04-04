@@ -56,4 +56,4 @@ if __name__ == "__main__":
     # Create content
     for file in test_files:
         shutil.copy(os.path.join(args.input_path, "images", file), os.path.join(out_test_folder, "images"))
-        shutil.copy(os.path.join(args.input_path, "images", file), os.path.join(out_test_folder, "images"))
+        shutil.copy(os.path.join(args.input_path, "groundtruth", file), os.path.join(out_test_folder, "groundtruth"))
