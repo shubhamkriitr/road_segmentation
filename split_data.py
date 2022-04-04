@@ -39,12 +39,12 @@ if __name__ == "__main__":
 
     # Remove existing content to avoid problems
     if os.path.exists(out_train_folder):
-        os.rmdir(out_train_folder)
+        shutil.rmtree(out_train_folder)
     os.makedirs(os.path.join(out_train_folder, "images"))
     os.makedirs(os.path.join(out_train_folder, "groundtruth"))
 
     if os.path.exists(out_test_folder):
-        os.rmdir(out_test_folder)
+        shutil.rmtree(out_test_folder)
     os.makedirs(os.path.join(out_test_folder, "images"))
     os.makedirs(os.path.join(out_test_folder, "groundtruth"))
 
