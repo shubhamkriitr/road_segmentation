@@ -9,6 +9,8 @@ import baseline_unet
 import efficient_unet
 from torchmetrics import F1Score
 import imageio
+from model_resnet50 import(PrunedResnet50, get_pruned_resnet50,
+                           get_frozen_pruned_resnet50)
 
 parser = argparse.ArgumentParser()
 
@@ -25,14 +27,22 @@ parser.add_argument(
 parser.add_argument("--threshold", default=0.5, type=float, help="probability threshold for being marked as a road")
 
 def get_model_from_name(model_name="unet", model_config={}):
-    if model_name == "unet":
+    # TODO: create a Model Factory instead
+    model_choices = ["unet", "baseline_unet", "efficient_unet",
+                     "pruned_resnet50", "frozen_pruned_resnet50"]
+    if model_name == model_choices[0]:
         return unet.UNet(**model_config)
-    elif model_name == "baseline_unet":
+    elif model_name == model_choices[1]:
         return baseline_unet.BaselineUNet(**model_config)
-    elif model_name == "efficient_unet":
+    elif model_name == model_choices[2]:
         return efficient_unet.EfficientUNet()
+    elif model_name == model_choices[3]:
+        return get_pruned_resnet50()
+    elif model_name == model_choices[4]:
+        return get_frozen_pruned_resnet50()
     else:
-        raise Exception("Model name not recognized. You should use one of the following: unet, baseline_unet")
+        raise NameError(f"Model name not recognized. You should"
+                        f"use one of the following: {model_choices}")
 
 def train(model: torch.nn.Module,
           loss_fn: callable,
