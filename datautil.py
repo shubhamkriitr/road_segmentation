@@ -12,6 +12,10 @@ import random
 # TODO: better to take this from run config sigleton
 TENSOR_FLOAT_DTYPE = torch.float32
 
+# Set random seed
+torch.manual_seed(10)
+random.seed(10)
+np.random.seed(0)
 
 # Using prefix `Seg` (for segmentation) to the classes below to distinguish
 # them from torchvision's  classes
