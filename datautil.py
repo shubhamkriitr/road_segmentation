@@ -188,8 +188,8 @@ def get_dataset(root_dir: str,
                 base_transformations="default",
                 additional_transformations="default",
                 image_folder="images",
-                label_folder="groundtruth"
-                ):
+                label_folder="groundtruth"):
+
     base_transformations = default_base_transformations if base_transformations == "default" else base_transformations if type(base_transformations) is dict else None
     additional_transformations = default_additional_transformations if additional_transformations == "default" else additional_transformations if type(additional_transformations) is dict else None
 
