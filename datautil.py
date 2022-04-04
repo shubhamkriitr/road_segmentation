@@ -17,6 +17,7 @@ torch.manual_seed(10)
 random.seed(10)
 np.random.seed(10)
 
+
 # Using prefix `Seg` (for segmentation) to the classes below to distinguish
 # them from torchvision's  classes
 class SegRotationTransform:
@@ -81,18 +82,29 @@ class SegAdjustContrast:
         return TF.adjust_contrast(x, factor), y
 
 
+class SegNormalize:
+    def __init__(self, mean=(0.5123, 0.5233, 0.5206), std=(0.2425, 0.2210, 0.2117)) -> None:
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, x, y):
+        return TF.normalize(x, self.mean, self.std), y
+
+
 class SegGaussianBlur:
     def __call__(self, x, y):
         return TF.gaussian_blur(x, kernel_size=(5, 9), sigma=(0.1, 5)), y
 
 
+# These will be performed as a first step
 default_base_transformations = {IdentityTransform(): 0.25,
                                 SegHorizontalFlip(): 0.25,
                                 SegVerticalFlip(): 0.25,
                                 SegRotationTransform(): 0.25}
 
+# Then these will be applied on top of the previous ones
 default_additional_transformations = {IdentityTransform(): 0.30,
-                                    SegRotationTransform(): 0.25,
+                                      SegRotationTransform(): 0.35,
                                       SegAdjustBrightness(): 0.15,
                                       SegGaussianBlur(): 0.05,
                                       SegAdjustContrast(): 0.15}
@@ -104,8 +116,8 @@ class CILRoadSegmentationDataset(Dataset):
                  image_folder="images",
                  label_folder="groundtruth",  # Set to none if no supervision
                  base_transformations=default_base_transformations,  # Dictionary where key is class to be applied, value is the probability
-                 additional_transformations=default_additional_transformations
-                 ):
+                 additional_transformations=default_additional_transformations,
+                 normalize=True):
 
         self.root_dir = root_dir
         self.num_samples = 0
@@ -118,6 +130,9 @@ class CILRoadSegmentationDataset(Dataset):
         # Store transformations
         self.base_transformations = base_transformations
         self.additional_transformations = additional_transformations
+        self.normalize = normalize
+        if self.normalize:
+            self.normalize_transform = SegNormalize()
 
         # Store name of images
         self._inspect_rootdir()
@@ -181,50 +196,41 @@ class CILRoadSegmentationDataset(Dataset):
                 transform = np.random.choice(list(self.additional_transformations.keys()), size=1, p=list(self.additional_transformations.values()))[0]
                 input_image, groundtruth = transform(input_image, groundtruth)
 
-        return input_image[:3], groundtruth
+        if self.normalize:
+            input_image, groundtruth = self.normalize_transform(input_image, groundtruth)
+
+        return input_image, groundtruth
 
 
 def get_dataset(root_dir: str,
                 base_transformations="default",
                 additional_transformations="default",
+                normalize=True,
                 image_folder="images",
                 label_folder="groundtruth"):
-
     base_transformations = default_base_transformations if base_transformations == "default" else base_transformations if type(base_transformations) is dict else None
     additional_transformations = default_additional_transformations if additional_transformations == "default" else additional_transformations if type(additional_transformations) is dict else None
 
     return CILRoadSegmentationDataset(root_dir=root_dir,
                                       base_transformations=base_transformations,
                                       additional_transformations=additional_transformations,
+                                      normalize=normalize,
                                       image_folder=image_folder,
                                       label_folder=label_folder)
 
 
-def get_dataloader(root_dir: str,
-                   batch_size: int = 10,
-                   shuffle: bool = True,
-                   transformations="default",
-                   image_folder="images",
-                   label_folder="groundtruth"):
-    dataset = get_dataset(root_dir, transformations, image_folder, label_folder)
-
-    return torch.utils.data.DataLoader(dataset, batch_size=batch_size, shuffle=shuffle)
-
-
 def get_train_test_dataloaders(root_dir: str,
-                               train_split: float = 0.8,
                                batch_size: int = 10,
                                shuffle: bool = True,
+                               normalize: bool = True,
                                base_transformations="default",
                                additional_transformations="default",
                                image_folder="images",
                                label_folder="groundtruth"):
-    dataset = get_dataset(root_dir, base_transformations, additional_transformations, image_folder, label_folder)
-
-    train_set, test_set = torch.utils.data.random_split(dataset, [int(len(dataset) * train_split), len(dataset) - int(len(dataset) * train_split)])
-
-    return torch.utils.data.DataLoader(train_set, batch_size=batch_size, shuffle=shuffle), torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=shuffle)
-
+    assert "train" in os.listdir(root_dir) and "test" in os.listdir(root_dir), "You must provide the path to the split/ folder"
+    train_dataset = get_dataset(os.path.join(root_dir, 'train'), base_transformations, additional_transformations, normalize, image_folder, label_folder)
+    test_dataset = get_dataset(os.path.join(root_dir, 'test'), None, None, normalize, image_folder, label_folder)
+    return torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle), torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=shuffle)
 
 """
  # Usage example
