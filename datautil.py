@@ -15,7 +15,7 @@ TENSOR_FLOAT_DTYPE = torch.float32
 # Set random seed
 torch.manual_seed(10)
 random.seed(10)
-np.random.seed(0)
+np.random.seed(10)
 
 # Using prefix `Seg` (for segmentation) to the classes below to distinguish
 # them from torchvision's  classes
