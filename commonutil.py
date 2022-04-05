@@ -6,6 +6,21 @@ from datetime import datetime
 
 PROJECTPATH = Path(__file__).parent.parent
 
+# Shall we take device info from single source? #TODO
+def resolve_device(key=None):
+    """
+    Returns `device name` to be used. (`key` will be used to 
+    resolve device name based on usage group, in case different device 
+    is required for diffrerent purposes. Currently it is
+    being ignored)
+    """
+    default_device = "cuda" if torch.cuda.is_available() else "cpu"
+    if key is not None:
+        raise NotImplementedError()
+    return default_device
+    
+    
+
 def get_timestamp_str(granularity=1000):
     if granularity != 1000:
         raise NotImplementedError()

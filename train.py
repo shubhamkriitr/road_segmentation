@@ -196,7 +196,7 @@ def main(args):
     # Define the paths
     assert args.data is not None, "Please specify the path to the training data"
 
-    train_dataloader, test_dataloader = get_train_test_dataloaders(args.data, train_split=0.8)
+    train_dataloader, test_dataloader = get_train_test_dataloaders(args.data)
 
     # Define the model
     model = get_model_from_name(model_name=args.model)

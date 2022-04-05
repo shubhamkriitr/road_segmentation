@@ -1,7 +1,8 @@
 import torch
 from torch import nn
 from torch import functional as F
-
+import torch.nn.functional
+from commonutil import resolve_device
 class Loss(nn.Module):
     reduction: str
 
@@ -62,6 +63,46 @@ class ClassWeightedBinaryGeneralizeDiceLoss(WeightedLoss):
         cost += - self.weight[0]*torch.sum(input_*target)/(torch.sum(input_+target) + 1e-7)
         return cost
 
+
+# Fixed-Kernel Modules
+class EdgeWeightingKernel(nn.Module):
+    def __init__(self, edge_weight_factor=10, num_channels=1, device=resolve_device()) -> None:
+        """
+        `edge_weight_factor` controls the weight given to edges as follows:
+        `final_weight` = `normalized_edge_map`*`edge_weight_factor` + 1.0
+        """
+        super().__init__()
+        self.num_channels = num_channels
+        self.device = device
+        self.edge_weight_factor = edge_weight_factor
+        self._init_edge_kernel()
+        
+    def forward(self, img):
+        """
+        Applies a 3 x 3 edge detection kernel
+        to `img`. `img` must have shape like: (Batch, num_channels, H, W).
+        """
+        with torch.no_grad():
+            edge_map =  F.conv2d(img, self.edge_kernel)
+            edge_map = torch.abs(edge_map)
+            max_values = torch.amax(edge_map, dim=(2, 3), keepdim=True) # along 
+            edge_map = edge_map/max_values
+        
+        return edge_map*self.edge_weight_factor + 1.0 # +1.0 for base map
+        
+    
+    def _init_edge_kernel(self):
+        kernel = torch.tensor(
+            data=[[1,  2,  -1],
+                  [2,  0, -2],
+                  [1, -2, -1]],
+            dtype=torch.float32, #TODO: take dtype from some central module/config
+            device=self.device,
+            requires_grad=False
+        )
+        self.edge_kernel = kernel.view(1, 1, 3, 3).repeat(1, self.num_channels, 1, 1)
+        self.edge_kernel.requires_grad = False
+        
 
 if __name__ == "__main__":
     
