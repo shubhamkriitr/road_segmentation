@@ -4,13 +4,20 @@ import unet
 import torch
 import argparse
 from datautil import *
-from cost_functions import *
+from cost_functions import (weighted_bce_loss,
+        EdgeWeightedBinaryGeneralizeDiceLoss)
 import baseline_unet
 import efficient_unet
 from torchmetrics import F1Score
 import imageio
 from model_resnet50 import(PrunedResnet50, get_pruned_resnet50,
                            get_frozen_pruned_resnet50)
+from loggingutil import logger
+
+# TODO: get cost function from factory instead
+SELECTED_COST_FUNCTION = EdgeWeightedBinaryGeneralizeDiceLoss()
+logger.info(f"SELECTED_COST_FUNCTION = {SELECTED_COST_FUNCTION}")
+#>>> 
 
 parser = argparse.ArgumentParser()
 
@@ -181,14 +188,7 @@ def write_images(model, dataloader, path, threshold):
             imageio.imwrite(f"{path}/{b}-{i}_thresholded.png", (thresholded[i, 0]*255).astype(np.uint8))
             imageio.imwrite(f"{path}/{b}-{i}_label.png", (y[i, 0]*255).astype(np.uint8))
 
-# TODO: move weighed BCE to cost_functions.py or remove?
-base_bce = torch.nn.BCELoss(reduction='none')
-def weighted_BCELoss(y_pred, y_true):
-    y_true = y_true[:, :1]
-    int_loss = base_bce(y_pred, y_true)
-    pred_round = y_pred.detach().round()
-    weights = torch.where((pred_round==0) & (y_true==1), 5, 1)
-    return torch.mean(weights*int_loss)
+
 
 def main(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -205,7 +205,7 @@ def main(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
     # Choose a loss
-    loss = weighted_BCELoss
+    loss = SELECTED_COST_FUNCTION # TODO: switch to factory
 
     model = train(model,
                   loss_fn=loss,

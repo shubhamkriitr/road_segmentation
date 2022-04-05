@@ -1,8 +1,19 @@
 import torch
 from torch import nn
-from torch import functional as F
+import torch.nn.functional as F
 import torch.nn.functional
 from commonutil import resolve_device
+
+
+base_bce = torch.nn.BCELoss(reduction='none')
+
+def weighted_bce_loss(y_pred, y_true):
+    y_true = y_true[:, :1]
+    int_loss = base_bce(y_pred, y_true)
+    pred_round = y_pred.detach().round()
+    weights = torch.where((pred_round==0) & (y_true==1), 5, 1)
+    return torch.mean(weights*int_loss)
+
 class Loss(nn.Module):
     reduction: str
 
@@ -43,6 +54,24 @@ class BinaryGeneralizeDiceLoss(Loss):
         cost = 1 - 2*torch.sum(input_*target)/(torch.sum(input_+target) + 1e-7)
         return cost
 
+
+class EdgeWeightedBinaryGeneralizeDiceLoss(Loss):
+    def __init__(self, edge_weight_factor=10, size_average=None,
+                 reduce=None, reduction: str = 'mean') -> None:
+        super().__init__(size_average, reduce, reduction)
+        self.edge_layer = EdgeWeightingKernel(
+            edge_weight_factor=edge_weight_factor)
+        
+
+    def forward(self, input_, target):
+        """Assumes input_ and target are of shape: (Batch, 1, H, W)
+        Where for each item in the batch, the slice along channel 
+        is a probabilty map for ouput class with label id `1`.
+        """
+        edge_weights = self.edge_layer(target)
+        cost = 1 - 2*torch.sum(input_*target*edge_weights)\
+                 /  (torch.sum(edge_weights*(input_+target)) + 1e-7)
+        return cost
 class BinaryGeneralizeDiceLossV2(BinaryGeneralizeDiceLoss):
     def __init__(self, size_average=None, reduce=None, reduction: str = 'mean') -> None:
         super().__init__(size_average, reduce, reduction)
@@ -83,7 +112,7 @@ class EdgeWeightingKernel(nn.Module):
         to `img`. `img` must have shape like: (Batch, num_channels, H, W).
         """
         with torch.no_grad():
-            edge_map =  F.conv2d(img, self.edge_kernel)
+            edge_map =  F.conv2d(img, self.edge_kernel, padding="same")
             edge_map = torch.abs(edge_map)
             max_values = torch.amax(edge_map, dim=(2, 3), keepdim=True) # along 
             edge_map = edge_map/max_values
