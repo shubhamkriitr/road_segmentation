@@ -36,7 +36,10 @@ class EfficientUNet(nn.Module): #TODO: change name
         self.upconv0 = nn.ConvTranspose2d(
             24, 32, kernel_size=2, stride=2
         )
-        self.decoder0 = EfficientUNet._block(2*32, 1, name="dec0")
+        self.decoder0 = EfficientUNet._block(2*32, 32, name="dec0")
+        self.last_cov = nn.Conv2d(
+            32, 1, kernel_size=1, stride=1
+        )
 
     def forward(self, x):
         if self.update_enet:
@@ -70,7 +73,7 @@ class EfficientUNet(nn.Module): #TODO: change name
         dec0 = self.upconv0(dec1)
         dec0 = torch.cat((dec0, self.encoder0(x)), dim=1)
         dec0 = self.decoder0(dec0)
-        return torch.sigmoid(dec0)
+        return torch.sigmoid(self.last_cov(dec0))
 
     @staticmethod
     def _block(in_channels, features, name):
