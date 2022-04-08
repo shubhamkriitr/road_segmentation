@@ -123,7 +123,7 @@ class PrunedConvnextBase(ConvNeXt):
             kernel_size=3, padding="same")
 
         self.conv_sharp = nn.Conv2d(
-            in_channels=3, out_channels=self.segmentation_output_channels,
+            in_channels=self.segmentation_output_channels, out_channels=self.segmentation_output_channels,
             kernel_size=7, padding="same") # Motivation, have a layer that just learns to fix roads from the output image
 
         self.final_activation_layer = nn.Sigmoid()
@@ -184,7 +184,12 @@ class PrunedConvnextBase(ConvNeXt):
 # TODO: add in model factory once decided we are using tht
 def model_getter(model_class, load_strictly=False):
     def _getter():
-        model_weights_path = PRETAINED_MODEL_PATHS["torchvision"]["convnext_tiny"]
+        if model_class == PrunedConvnextTiny:
+            model_weights_path = PRETAINED_MODEL_PATHS["torchvision"]["convnext_tiny"]
+        elif model_class == PrunedConvnextBase:
+            model_weights_path = PRETAINED_MODEL_PATHS["torchvision"]["convnext_base"]
+        else:
+            raise Exception("Not supported model_class")
         logger.debug(f"Loadin weights from : {model_weights_path}")
         state_dict = torch.load(model_weights_path)
         model = model_class()
