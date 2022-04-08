@@ -12,6 +12,7 @@ from torchmetrics import F1Score
 import imageio
 from model_resnet50 import(PrunedResnet50, get_pruned_resnet50,
                            get_frozen_pruned_resnet50)
+from model_convnext import get_pruned_convnext_tiny, get_pruned_convnext_base
 from loggingutil import logger
 
 # TODO: get cost function from factory instead
@@ -36,7 +37,7 @@ parser.add_argument("--threshold", default=0.5, type=float, help="probability th
 def get_model_from_name(model_name="unet", model_config={}):
     # TODO: create a Model Factory instead
     model_choices = ["unet", "baseline_unet", "efficient_unet",
-                     "pruned_resnet50", "frozen_pruned_resnet50"]
+                     "pruned_resnet50", "frozen_pruned_resnet50", "pruned_convnext_tiny", "pruned_convnext_base"]
     if model_name == model_choices[0]:
         return unet.UNet(**model_config)
     elif model_name == model_choices[1]:
@@ -47,6 +48,10 @@ def get_model_from_name(model_name="unet", model_config={}):
         return get_pruned_resnet50()
     elif model_name == model_choices[4]:
         return get_frozen_pruned_resnet50()
+    elif model_name == model_choices[5]:
+        return get_pruned_convnext_tiny()
+    elif model_name == model_choices[6]:
+        return get_pruned_convnext_base()
     else:
         raise NameError(f"Model name not recognized. You should"
                         f"use one of the following: {model_choices}")
