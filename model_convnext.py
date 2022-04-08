@@ -188,7 +188,7 @@ def model_getter(model_class, load_strictly=False):
         if model_class == PrunedConvnextTiny:
             model_weights_path = PRETAINED_MODEL_PATHS["torchvision"]["convnext_tiny"]
         elif model_class == PrunedConvnextSmall:
-            model_weights_path = PRETAINED_MODEL_PATHS["torchvision"]["convnext_small"]
+            raise NotImplementedError("Not implemented yet")
         else:
             raise Exception("Not supported model_class")
         logger.debug(f"Loadin weights from : {model_weights_path}")
