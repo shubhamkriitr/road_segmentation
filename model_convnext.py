@@ -11,7 +11,8 @@ PRETAINED_MODEL_PATHS = {
     "torchvision": {
         "resnet50": "../data/saved_models/torch/resnet50/resnet50-0676ba61.pth",
         "convnext_tiny": "../data/saved_models/torch/convnext/convnext_tiny-983f1562.pth",
-        "convnext_base": "../data/saved_models/torch/convnext/convnext_base-6075fbad.pth"
+        "convnext_base": "../data/saved_models/torch/convnext/convnext_base-6075fbad.pth",
+        "convnext_small": "../data/saved_models/torch/convnext/convnext_small-0c510722.pth"
     }
 }
 
@@ -98,24 +99,24 @@ class PrunedConvnextTiny(ConvNeXt):
         )
 
 
-class PrunedConvnextBase(ConvNeXt):
+class PrunedConvnextSmall(ConvNeXt):
     def __init__(self) -> None:
         # Configuration for tine convnext
-        super().__init__(block_setting= [
-            CNBlockConfig(128, 256, 3),
-            CNBlockConfig(256, 512, 3),
-            CNBlockConfig(512, 1024, 27),
-            CNBlockConfig(1024, None, 3),
-                                            ],
-                        stochastic_depth_prob=0.5)
+        super().__init__(    block_setting = [
+        CNBlockConfig(96, 192, 3),
+        CNBlockConfig(192, 384, 3),
+        CNBlockConfig(384, 768, 27),
+        CNBlockConfig(768, None, 3),
+    ],
+                        stochastic_depth_prob=0.4)
 
         self.segmentation_output_channels = 1
 
         # new layers appended for segmentation (decoder part)
-        self.transpose_block1 = self.make_transposed_block(1024, 512, 4)
-        self.transpose_block2 = self.make_transposed_block(512 * 2, 256)
-        self.transpose_block3 = self.make_transposed_block(256 * 2, 128)
-        self.transpose_block4 = self.make_transposed_block(128 * 2, 64)
+        self.transpose_block1 = self.make_transposed_block(768, 384, 4)
+        self.transpose_block2 = self.make_transposed_block(384 * 2, 192)
+        self.transpose_block3 = self.make_transposed_block(192 * 2, 96)
+        self.transpose_block4 = self.make_transposed_block(96 * 2, 64)
         self.transpose_block5 = self.make_transposed_block(64, 32)
 
         self.conv_final = nn.Conv2d(
@@ -135,14 +136,14 @@ class PrunedConvnextBase(ConvNeXt):
     def forward(self, x: Tensor) -> Tensor:
         # >>> return super()._forward_impl(x)
         #  N.B. : Make sure to check this implementation in parent class
-        x_0 = self.features[0](x)  # -> torch.Size([1, 128, 100, 100])
-        x_1 = self.features[1](x_0)  # -> torch.Size([1, 128, 100, 100])
-        x_2 = self.features[2](x_1)  # -> torch.Size([1, 256, 50, 50])
-        x_3 = self.features[3](x_2)  # -> torch.Size([1, 256, 50, 50])
-        x_4 = self.features[4](x_3)  # -> torch.Size([1, 512, 25, 25])
-        x_5 = self.features[5](x_4)  # -> torch.Size([1, 512, 25, 25])
-        x_6 = self.features[6](x_5)  # -> torch.Size([1, 1024, 12, 12])
-        x_7 = self.features[7](x_6)  # -> torch.Size([1, 1024, 12, 12])
+        x_0 = self.features[0](x)  # -> torch.Size([1, 96, 100, 100])
+        x_1 = self.features[1](x_0)  # -> torch.Size([1, 96, 100, 100])
+        x_2 = self.features[2](x_1)  # -> torch.Size([1, 192, 50, 50])
+        x_3 = self.features[3](x_2)  # -> torch.Size([1, 192, 50, 50])
+        x_4 = self.features[4](x_3)  # -> torch.Size([1, 384, 25, 25])
+        x_5 = self.features[5](x_4)  # -> torch.Size([1, 384, 25, 25])
+        x_6 = self.features[6](x_5)  # -> torch.Size([1, 768, 12, 12])
+        x_7 = self.features[7](x_6)  # -> torch.Size([1, 768, 12, 12])
 
         # Decode
         out = self.transpose_block1(x_7)  # -> torch.Size([1, 512, 25, 25])
@@ -186,8 +187,8 @@ def model_getter(model_class, load_strictly=False):
     def _getter():
         if model_class == PrunedConvnextTiny:
             model_weights_path = PRETAINED_MODEL_PATHS["torchvision"]["convnext_tiny"]
-        elif model_class == PrunedConvnextBase:
-            model_weights_path = PRETAINED_MODEL_PATHS["torchvision"]["convnext_base"]
+        elif model_class == PrunedConvnextSmall:
+            model_weights_path = PRETAINED_MODEL_PATHS["torchvision"]["convnext_small"]
         else:
             raise Exception("Not supported model_class")
         logger.debug(f"Loadin weights from : {model_weights_path}")
@@ -210,4 +211,4 @@ def model_getter(model_class, load_strictly=False):
 
 
 get_pruned_convnext_tiny = model_getter(PrunedConvnextTiny, False)
-get_pruned_convnext_base = model_getter(PrunedConvnextBase, False)
+get_pruned_convnext_small = model_getter(PrunedConvnextSmall, False)
