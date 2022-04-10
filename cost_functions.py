@@ -2,7 +2,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import torch.nn.functional
-from commonutil import resolve_device
+from commonutil import resolve_device, BaseFactory
 
 
 base_bce = torch.nn.BCELoss(reduction='none')
@@ -141,9 +141,29 @@ class EdgeWeightingKernel(nn.Module):
         self.edge_kernel.requires_grad = False
         
 
+COST_FUNCTION_NAME_TO_CLASS_MAP = {
+    "ClassWeightedBinaryGeneralizeDiceLoss":\
+        ClassWeightedBinaryGeneralizeDiceLoss,
+    "BinaryGeneralizeDiceLoss": BinaryGeneralizeDiceLoss,
+    "weighted_bce_loss": lambda : weighted_bce_loss,
+    "ThresholdedBinaryGeneralizedDiceLoss":\
+        ThresholdedBinaryGeneralizedDiceLoss
+    
+}
+
+class CostFunctionFactory(BaseFactory):
+    def __init__(self, config=None) -> None:
+        super().__init__(config)
+        self.resource_map = COST_FUNCTION_NAME_TO_CLASS_MAP
+    
+    def get(self, cost_function_class_name, config=None,
+            args_to_pass=[], kwargs_to_pass={}):
+        return super().get(cost_function_class_name, config,
+                           args_to_pass, kwargs_to_pass)
 if __name__ == "__main__":
     
-
+    cf = CostFunctionFactory().get("ClassWeightedBinaryGeneralizeDiceLoss")
+    
     def test_1(loss_func, input_, target):
         print("Input:\n", input_)
         print("target:\n", target)

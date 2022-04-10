@@ -14,7 +14,7 @@ from datautil import (DataLoaderUtilFactory)
 from model_factory import ModelFactory
 from commonutil import get_timestamp_str, BaseFactory
 from loggingutil import logger
-
+from cost_functions import CostFunctionFactory
 
 
 class BaseTrainer(object):
@@ -239,11 +239,18 @@ class ExperimentPipeline(BaseExperimentPipeline):
         logger.info(f"Trainable Parameters: {trainable_param_names} ")
         lr = self.config["learning_rate"]
         weight_decay = self.config["weight_decay"]
-        optimizer_class = AdamW # Adam
-        self.optimizer = optimizer_class(
-            lr=lr, weight_decay=weight_decay,
-            params=trainable_params
-            )
+        # TODO: Discuss and Add subfields (2nd level nesting) in the experminet 
+        # config (yaml files) to pass args and kwargs if needed 
+        self.optimizer = OptimizerFactory().get(
+            self.config["optimizer_class_name"],
+            config=None,
+            args_to_pass=[],
+            kwargs_to_pass={
+                "lr": lr,
+                "weight_decay": weight_decay,
+                "params": trainable_params
+            }
+        )
     
     def prepare_scheduler(self):
         if "scheduler" not in self.config:
@@ -290,31 +297,19 @@ class ExperimentPipeline(BaseExperimentPipeline):
 
     def prepare_cost_function(self):
         class_weights = self.prepare_class_weights_for_cost_function()
+        kwargs_to_pass = {}
         if class_weights is not None:
-            print("Using class weights: ", class_weights)
-        if self.config["cost_function_class_name"] == "MSELoss":
-            print("Using: MSELoss")
-            self.cost_function = nn.MSELoss()
-        elif self.config["cost_function_class_name"] == "CrossEntropyLoss":
-            print("Using: CrossEntropyLoss")
-            self.cost_function = nn.CrossEntropyLoss(weight=class_weights)
-        elif self.config["cost_function_class_name"] == "BCELoss":
-            print("Using: BCELoss")
-            self.cost_function = nn.BCELoss(weight=class_weights    )
-        else:
-            raise NotImplementedError()
+            kwargs_to_pass["weight"] = class_weights
+        
+        self.cost_function = CostFunctionFactory().get(
+            self.config["cost_function_class_name"],
+            config=None,
+            args_to_pass=[],
+            kwargs_to_pass=kwargs_to_pass
+        )
     
     def prepare_class_weights_for_cost_function(self):
-        if "do_class_weighting" in self.config and \
-                self.config["do_class_weighting"]:
-            # Based on the data loader being used and the weighting scheme,
-            #  fetch the class weights
-            return ClassWeights().get(
-                self.config["dataloader_util_class_name"],
-                self.config["class_weighting_scheme"])
-        
-        # None is the default value for most of the cost classes
-
+        # TODO: Add if needed
         return None
         
 
