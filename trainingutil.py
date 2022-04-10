@@ -384,8 +384,6 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             "best_model.ckpt")
             torch.save(model.state_dict(), file_path)
 
-            self.generate_roc_curves(self.test_loader.dataset.y,
-                 y_test_pred_prob)
         if hasattr(self, "scheduler"):
             self.scheduler.step(metric_to_use_for_model_selection)
             next_lr = [group['lr'] for group in self.optimizer.param_groups][0]
@@ -440,13 +438,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         self.summary_writer.flush()
         return f1, acc, loss, y_pred_prob
     
-    def generate_roc_curves(self, y_true, y_pred_prob):
-        if "generate_roc_curves" not in self.config:
-            return
-        if not self.config["generate_roc_curves"]:
-            return
-        save_path_prefix = os.path.join(self.current_experiment_log_directory,
-             get_timestamp_str() + "_metrics_")
+    
         
         
 
