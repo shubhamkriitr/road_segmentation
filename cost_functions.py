@@ -54,6 +54,14 @@ class BinaryGeneralizeDiceLoss(Loss):
         cost = 1 - 2*torch.sum(input_*target)/(torch.sum(input_+target) + 1e-7)
         return cost
 
+class ThresholdedBinaryGeneralizedDiceLoss(BinaryGeneralizeDiceLoss):
+    def __init__(self, threshold=0.3, size_average=None, reduce=None, reduction: str = 'mean') -> None:
+        super().__init__(size_average, reduce, reduction)
+        self.threshold = threshold
+    
+    def forward(self, input_, target):
+        input_ = torch.where(input_>self.threshold, 1., 0.)
+        return super().forward(input_, target)
 
 class EdgeWeightedBinaryGeneralizeDiceLoss(Loss):
     def __init__(self, edge_weight_factor=10, size_average=None,
