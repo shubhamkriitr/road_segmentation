@@ -368,28 +368,35 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         model.eval()
         # 
 
-        with torch.no_grad():
-            val_f1, _, _, _ = self.compute_and_log_evaluation_metrics(
-                model, current_epoch, "val")
-            test_f1, _, _, y_test_pred_prob = self.compute_and_log_evaluation_metrics(
-                model, current_epoch, "test")
-        
-        metric_to_use_for_model_selection = val_f1 # TODO: can be pulled in config
+        val_f1, _ = self.compute_and_log_evaluation_metrics(
+            model, current_epoch, "val")
+    
+        # TODO: metric can also be pulled in config
+        metric_to_use_for_model_selection = val_f1 
         metric_name = "Validation F1-Score"
+        
         if self.best_metric is None or \
              (self.best_metric < metric_to_use_for_model_selection):
-            logger.info(f"Saving model: {metric_name} changed from {self.best_metric}"
-                  f" to {metric_to_use_for_model_selection}")
+            logger.info(f"Saving model: {metric_name} changed from "
+                  f"{self.best_metric} to {metric_to_use_for_model_selection}")
             self.best_metric = metric_to_use_for_model_selection
             file_path = os.path.join(self.current_experiment_directory,
-            "best_model.ckpt")
+            "best_model_{self.config["model_name_tag"]}.ckpt")
             torch.save(model.state_dict(), file_path)
+        
+        if (current_epoch % self.config["model_save_frequency"] == 0):
+            file_path = os.path.join(self.current_experiment_directory,
+            f"model_{self.config['model_name_tag']}_"\
+                +f"{str(current_epoch).zfill(4)}.ckpt")
 
         if hasattr(self, "scheduler"):
             self.scheduler.step(metric_to_use_for_model_selection)
             next_lr = [group['lr'] for group in self.optimizer.param_groups][0]
             self.summary_writer.add_scalar("lr", next_lr,
              current_epoch)
+        
+        # don't forget to dump log so far
+        self.summary_writer.flush()
         return self.best_metric
 
     def compute_and_log_evaluation_metrics(self, model, current_epoch,
@@ -428,7 +435,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                     f" {eval_loss / len(self.val_loader.dataset)}")
         logger.info(
             f"F1-Score after epoch {current_epoch}/{n_epochs}: {f1_value}")
-        self.summary_writer.flush()
+        
         return f1_value, loss
     
     

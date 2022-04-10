@@ -23,6 +23,9 @@ weight_decay: 0.0000001
 logdir: "runs"
 batch_log_frequency: 1 # Print log after after these many batches
 tensorboard_log_frequency: 100 # Log scalars after these many batches
+model_save_frequency: 2 # frequency in epochs
+model_name_tag: "sample" # it will be included in the model file name
+save_images: true
 test_batch_size: 100 # TODO: currently NOT being used
 do_class_weighting: null
 class_weighting_scheme: null
