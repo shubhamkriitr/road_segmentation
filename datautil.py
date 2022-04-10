@@ -232,17 +232,57 @@ def get_train_test_dataloaders(root_dir: str,
     test_dataset = get_dataset(os.path.join(root_dir, 'test'), None, None, normalize, image_folder, label_folder)
     return torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle), torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=shuffle)
 
+
+class VanillaDataLoaderUtil(object):
+    def __init__(self, config=None) -> None:
+        self.config = config # currently not in use (adding for extension)#TODO 
+
+    def get_data_loaders(self, root_dir: str,
+                               batch_size: int = 10,
+                               shuffle: bool = True,
+                               normalize: bool = True):
+        """
+        Returns tuple of (train_loader, val_loader, test_loader)
+        """
+        train_loader, val_loader = get_train_test_dataloaders(
+            root_dir=root_dir,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            normalize=normalize
+        )
+        return train_loader, val_loader, None # no test loader
+        
+        
+DATALOADER_UTIL_CLASS_MAP = {
+    "VanillaDataLoaderUtil": VanillaDataLoaderUtil
+}
+
+class DataLoaderUtilFactory:
+    def __init__(self, config=None) -> None:
+        self.config = config
+        self.resource_map = DATALOADER_UTIL_CLASS_MAP
+    
+    def get(self, dataloader_util_class_name, config=None):
+        # currently not using config #TODO
+        loader_util_class = self.resource_map[dataloader_util_class_name]
+        try:
+            return loader_util_class(config=config)
+        except TypeError as err:
+            if config is not None:
+                raise err
+        return loader_util_class()
+        
 """
- # Usage example
- 
-from matplotlib import pyplot as plt
-
-dataset = get_dataset("../data/training")
-dataloader = get_dataloader("../data/training")
-train_dataloader, test_dataloader = get_train_test_dataloaders("../data/training", train_split=0.8)
-
-x, y = dataset.__getitem__(1)
-
-plt.imshow(x.permute(1,2,0).numpy())
+>>>  # Usage example
+>>>  
+>>> from matplotlib import pyplot as plt
+>>> 
+>>> dataset = get_dataset("../data/training")
+>>> dataloader = get_dataloader("../data/training")
+>>> train_dataloader, test_dataloader = get_train_test_dataloaders("../data/training", train_split=0.8)
+>>> 
+>>> x, y = dataset.__getitem__(1)
+>>> 
+>>> plt.imshow(x.permute(1,2,0).numpy())
 
 """
