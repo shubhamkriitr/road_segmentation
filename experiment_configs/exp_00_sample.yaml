@@ -10,13 +10,13 @@ normalize: false
 # is supposed to return loaders upon invoking its `get_data_loaders`
 val_split: 0.2 # TODO: currently NOT being used - It is assumed that dataloader
 # util will give already split data loaders
-model_class_name: "BidirLstmModelMITBIH" # The network to use
+model_class_name: "UNet" # The network to use e.g. UNet
 load_from_checkpoint: false
 checkpoint_path: ""
-cost_function_class_name: "CrossEntropyLoss"
+cost_function_class_name: "BinaryGeneralizeDiceLoss"
 trainer_class_name: "NetworkTrainer"
-num_epochs: 100
-batch_size: 100
+num_epochs: 5
+batch_size: 8
 optimizer_class_name: "AdamW" # FIXME: Add this in the pipeline
 learning_rate: 0.001
 weight_decay: 0.0000001

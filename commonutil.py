@@ -51,13 +51,16 @@ class BaseFactory(object):
     def get(self, resource_name, config=None,
             args_to_pass=[], kwargs_to_pass={}):
         # currently not using config
-        try:
-            resource_class = self.resource_map[resource_name]
-        except KeyError:
-            raise KeyError(f"{resource_name} is not allowed. Please use one of"
-                           f" these names: {list(self.resource_map.keys())}")
+        resource_class = self.get_uninitialized(resource_name)
         
         if config is not None:
             return resource_class(config=config)
         
         return resource_class(*args_to_pass, **kwargs_to_pass)
+
+    def get_uninitialized(self, resource_name):
+        try:
+            return self.resource_map[resource_name]
+        except KeyError:
+            raise KeyError(f"{resource_name} is not allowed. Please use one of"
+                           f" these names: {list(self.resource_map.keys())}") 

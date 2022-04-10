@@ -189,7 +189,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
             .get(dataloader_util_class_name, config=None)\
             .get_data_loaders(root_dir=self.config["dataloader_root_dir"],
                               batch_size=train_batch_size,
-                              shuffle=self.config["shuffle"]
+                              shuffle=self.config["shuffle"],
                               normalize=self.config["normalize"])
             
         
@@ -200,7 +200,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
         return train_loader, val_loader, test_loader
 
     def prepare_trainer(self):
-        trainer_class = TrainerFactory().get(
+        trainer_class = TrainerFactory().get_uninitialized(
             self.config["trainer_class_name"])
         
         trainer = trainer_class(model=self.model,
@@ -220,7 +220,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
 
     def prepare_model(self):
         # TODO: use model config too (or make it work by creating new class)
-        model = ModelFactory().get(self.config["model_class_name"])()
+        model = ModelFactory().get(self.config["model_class_name"])
         self.model = model
 
         if self.config["load_from_checkpoint"]:
@@ -381,13 +381,14 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                   f"{self.best_metric} to {metric_to_use_for_model_selection}")
             self.best_metric = metric_to_use_for_model_selection
             file_path = os.path.join(self.current_experiment_directory,
-            "best_model_{self.config["model_name_tag"]}.ckpt")
+            "best_model_{self.config['model_name_tag']}.ckpt")
             torch.save(model.state_dict(), file_path)
         
         if (current_epoch % self.config["model_save_frequency"] == 0):
             file_path = os.path.join(self.current_experiment_directory,
             f"model_{self.config['model_name_tag']}_"\
                 +f"{str(current_epoch).zfill(4)}.ckpt")
+            torch.save(model.state_dict(), file_path)
 
         if hasattr(self, "scheduler"):
             self.scheduler.step(metric_to_use_for_model_selection)
