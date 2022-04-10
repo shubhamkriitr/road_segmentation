@@ -1,0 +1,27 @@
+pipeline_class: "ExperimentPipelineForSegmentation" # choose the pipeline
+experiment_metadata:
+  description: "This is a sample experiment"
+  tag: "exp_00_sample"
+dataloader_util_class_name: "VanillaDataLoaderUtil" # This utility class
+dataloader_root_dir: "data/split" # set root dir to load data from
+shuffle: true
+normalize: false
+# is supposed to return loaders upon invoking its `get_data_loaders`
+val_split: 0.2 # TODO: currently NOT being used - It is assumed that dataloader
+# util will give already split data loaders
+model_class_name: "BidirLstmModelMITBIH" # The network to use
+load_from_checkpoint: false
+checkpoint_path: ""
+cost_function_class_name: "CrossEntropyLoss"
+trainer_class_name: "NetworkTrainer"
+num_epochs: 100
+batch_size: 100
+optimizer_class_name: "AdamW" # FIXME: Add this in the pipeline
+learning_rate: 0.001
+weight_decay: 0.0000001
+logdir: "runs"
+batch_log_frequency: 1 # Print log after after these many batches
+tensorboard_log_frequency: 100 # Log scalars after these many batches
+test_batch_size: 100 # TODO: currently NOT being used
+do_class_weighting: null
+class_weighting_scheme: null

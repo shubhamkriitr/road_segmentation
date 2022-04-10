@@ -10,12 +10,10 @@ from torch.optim.adamw import AdamW
 from torch.optim.optimizer import Optimizer
 from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-from data_loader import DataLoaderUtil, ClassWeights
+from datautil import (DataLoaderUtilFactory)
 from model_factory import ModelFactory
-from util import get_timestamp_str
-
-
-logger = logging.getLogger(name=__name__)
+from commonutil import get_timestamp_str
+from loggingutil import logger
 
 
 class BaseTrainer(object):
@@ -163,16 +161,18 @@ class ExperimentPipeline(BaseExperimentPipeline):
 
 
     def prepare_dataloaders(self):
-        dataloader_class_name = self.config["dataloader_class_name"]
+        dataloader_util_class_name = self.config["dataloader_util_class_name"]
         train_batch_size = self.config["batch_size"]
 
         train_loader, val_loader, test_loader \
-        = DataLoaderUtil().get_data_loaders(
-        dataloader_class_name,
-        train_batch_size=train_batch_size, 
-        val_batch_size=1,
-        test_batch_size=self.config["test_batch_size"], 
-        train_shuffle=True, val_split=self.config["val_split"])
+        = DataLoaderUtilFactory()\
+            .get(dataloader_util_class_name, config=None)\
+            .get_data_loaders(root_dir=self.config["dataloader_root_dir"],
+                              batch_size=train_batch_size,
+                              shuffle=self.config["shuffle"]
+                              normalize=self.config["normalize"])
+            
+        
 
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -290,7 +290,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
             # Based on the data loader being used and the weighting scheme,
             #  fetch the class weights
             return ClassWeights().get(
-                self.config["dataloader_class_name"],
+                self.config["dataloader_util_class_name"],
                 self.config["class_weighting_scheme"])
         
         # None is the default value for most of the cost classes
