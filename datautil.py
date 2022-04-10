@@ -8,6 +8,7 @@ import logging
 import PIL
 import numpy as np
 import random
+from commonutil import BaseFactory
 
 # TODO: better to take this from run config sigleton
 TENSOR_FLOAT_DTYPE = torch.float32
@@ -252,25 +253,18 @@ class VanillaDataLoaderUtil(object):
         )
         return train_loader, val_loader, None # no test loader
         
-        
+# Add newly created specialized loader utils here        
 DATALOADER_UTIL_CLASS_MAP = {
     "VanillaDataLoaderUtil": VanillaDataLoaderUtil
 }
 
-class DataLoaderUtilFactory:
+class DataLoaderUtilFactory(BaseFactory):
     def __init__(self, config=None) -> None:
-        self.config = config
+        super().__init__(config)
         self.resource_map = DATALOADER_UTIL_CLASS_MAP
     
     def get(self, dataloader_util_class_name, config=None):
-        # currently not using config #TODO
-        loader_util_class = self.resource_map[dataloader_util_class_name]
-        try:
-            return loader_util_class(config=config)
-        except TypeError as err:
-            if config is not None:
-                raise err
-        return loader_util_class()
+        return super().get(dataloader_util_class_name, config)
         
 """
 >>>  # Usage example
