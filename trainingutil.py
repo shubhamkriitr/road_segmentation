@@ -68,7 +68,7 @@ class BaseTrainer(object):
             try:
                 callback(*args, **kwargs)
             except Exception as exc:
-                logger.error(exc)
+                logger.exception(exc)
 
 class NetworkTrainer(BaseTrainer):
 
@@ -326,7 +326,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
                     current_epoch, current_epoch_batch_number, **kwargs):
         
         if global_batch_number % self.config["batch_log_frequency"] == 0:
-            print(
+            logger.info(
             f"[({global_batch_number}){current_epoch}-{current_epoch_batch_number}]"
             f" Loss: {kwargs['loss']}")
         if global_batch_number % self.config["tensorboard_log_frequency"] == 0:
@@ -347,7 +347,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
             with open(file_path, 'w') as f:
                 yaml.dump(self.config, f)
         except Exception as exc:
-            print(exc) # TODO: replace all prints with logger         
+            logger.exception(exc)       
 
 
 
@@ -377,7 +377,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         metric_name = "Validation F1-Score"
         if self.best_metric is None or \
              (self.best_metric < metric_to_use_for_model_selection):
-            print(f"Saving model: {metric_name} changed from {self.best_metric}"
+            logger.info(f"Saving model: {metric_name} changed from {self.best_metric}"
                   f" to {metric_to_use_for_model_selection}")
             self.best_metric = metric_to_use_for_model_selection
             file_path = os.path.join(self.current_experiment_directory,
@@ -406,7 +406,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         try:
             model_output = model(x)
         except Exception as exc:
-            print(exc)
+            logger.exception(exc)
 
         if hasattr(model, "predict"):
             y_pred_prob = model.predict(x)
@@ -420,19 +420,20 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         if "task_type" in self.config and \
                 self.config["task_type"] == "binary_classification":
             if torch.max(y_pred_prob) > 1.0 or torch.min(y_pred_prob) < 0.:
-                print("warning!: expected probability but received logits!")
+                logger.warning(
+                    "warning!: expected probability but received logits!")
             y_pred = (y_pred_prob>0.5).type(torch.int8)
         else:
             y_pred = torch.argmax(y_pred_prob, axis=1)
         f1 = f1_score(y_true, y_pred, average="macro")
 
-        print("%s f1 score : %s "% (eval_type, f1))
+        logger.info("%s f1 score : %s "% (eval_type, f1))
 
         acc = accuracy_score(y_true, y_pred)
             
         loss = self.cost_function(input=model_output, target=y_true)
-        print(f"{eval_type} acc: {acc}")
-        print(f"{eval_type} loss: {loss}")
+        logger.info(f"{eval_type} acc: {acc}")
+        logger.info(f"{eval_type} loss: {loss}")
         self.summary_writer.add_scalar(f"{eval_type}/loss", loss, current_epoch)
         self.summary_writer.add_scalar(f"{eval_type}/F1", f1, current_epoch)
         self.summary_writer.add_scalar(f"{eval_type}/Accuracy", acc, current_epoch)
