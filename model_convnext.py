@@ -30,7 +30,7 @@ class PrunedConvnextTiny(ConvNeXt):
         self.segmentation_output_channels = 1
 
         # new layers appended for segmentation (decoder part)
-        self.transpose_block1 = self.make_transposed_block(768, 384, 4)
+        self.transpose_block1 = self.make_transposed_block(768, 384, 3, 0, 0)
         self.transpose_block2 = self.make_transposed_block(384 * 2, 192)
         self.transpose_block3 = self.make_transposed_block(192 * 2, 96)
         self.transpose_block4 = self.make_transposed_block(96 * 2, 64)
