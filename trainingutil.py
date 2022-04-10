@@ -12,8 +12,9 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from datautil import (DataLoaderUtilFactory)
 from model_factory import ModelFactory
-from commonutil import get_timestamp_str
+from commonutil import get_timestamp_str, BaseFactory
 from loggingutil import logger
+
 
 
 class BaseTrainer(object):
@@ -133,13 +134,17 @@ class BaseExperimentPipeline(object):
 # dictionary to refer to class by name
 # (to be used in config)
 TRAINER_NAME_TO_CLASS_MAP = {
-    "NetworkTrainer": NetworkTrainer # it is generic enough to be used by all of the networks we experimented with
+    "NetworkTrainer": NetworkTrainer
 }
 
 # Factory class to get trainer class by name
-class TrainerFactory(object):
-    def get(self, trainer_name):
-        return TRAINER_NAME_TO_CLASS_MAP[trainer_name]
+class TrainerFactory(BaseFactory):
+    def __init__(self, config=None) -> None:
+        super().__init__(config)
+        self.resource_map = TRAINER_NAME_TO_CLASS_MAP
+     
+    def get(self, trainer_name, config=None):
+        return super().get(trainer_name, config)
 
 
 

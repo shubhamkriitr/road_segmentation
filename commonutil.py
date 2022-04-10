@@ -44,19 +44,20 @@ def group_param_names_by_trainability(model):
 
 class BaseFactory(object):
     def __init__(self, config=None) -> None:
-        self.config = config
-        self.resource_map = {}
+        self.config = {} if config is None else config 
+        self.resource_map = self.config["resource_map"] if "resource_map" in \
+            self.config else {}
     
     def get(self, resource_name, config=None):
         # currently not using config
         try:
-            resource_class = self.resource_map[resource_name]
+            resource_getter = self.resource_map[resource_name]
         except KeyError:
             raise KeyError(f"{resource_name} is not allowed. Please use one of"
                            f" these names: {list(self.resource_map.keys())}")
         try:
-            return resource_class(config=config)
+            return resource_getter(config=config)
         except TypeError as err:
             if config is not None:
                 raise err
-        return resource_class()
+        return resource_getter()
