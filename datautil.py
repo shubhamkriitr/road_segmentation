@@ -263,8 +263,10 @@ class DataLoaderUtilFactory(BaseFactory):
         super().__init__(config)
         self.resource_map = DATALOADER_UTIL_CLASS_MAP
     
-    def get(self, dataloader_util_class_name, config=None):
-        return super().get(dataloader_util_class_name, config)
+    def get(self, dataloader_util_class_name, config=None,
+            args_to_pass=[], kwargs_to_pass={}):
+        return super().get(dataloader_util_class_name, config,
+            args_to_pass, kwargs_to_pass)
         
 """
 >>>  # Usage example

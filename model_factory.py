@@ -28,9 +28,11 @@ class ModelFactory(BaseFactory):
         super().__init__(config)
         self.resource_map = MODEL_NAME_TO_CLASS_OR_INTIALIZER_MAP
 
-    def get(self, model_name, config=None):
+    def get(self, model_name, config=None,
+            args_to_pass=[], kwargs_to_pass={}):
         # handle models 
-        return super().get(model_name, config)
+        return super().get(model_name, config,
+                            args_to_pass, kwargs_to_pass)
 
 class TrainedModelFactory(ModelFactory):
     def __init__(self, config = {}) -> None:

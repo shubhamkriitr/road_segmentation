@@ -143,10 +143,25 @@ class TrainerFactory(BaseFactory):
         super().__init__(config)
         self.resource_map = TRAINER_NAME_TO_CLASS_MAP
      
-    def get(self, trainer_name, config=None):
-        return super().get(trainer_name, config)
+    def get(self, trainer_name, config=None,
+            args_to_pass=[], kwargs_to_pass={}):
+        return super().get(trainer_name, config,
+                            args_to_pass=[], kwargs_to_pass={})
 
-
+# TODO: may move optimizer part to another file
+OPTIMIZER_NAME_TO_CLASS_OR_INITIALIZER_MAP = {
+    "Adam": Adam,
+    "AdamW": AdamW
+}
+class OptimizerFactory(BaseFactory):
+    def __init__(self, config=None) -> None:
+        super().__init__(config)
+        self.resource_map = OPTIMIZER_NAME_TO_CLASS_OR_INITIALIZER_MAP
+    
+    def get(self, optimizer_name, config=None,
+                args_to_pass=[], kwargs_to_pass={}):
+        return super().get(optimizer_name, config,
+            args_to_pass, kwargs_to_pass)
 
 class ExperimentPipeline(BaseExperimentPipeline):
     def __init__(self, config) -> None:
@@ -220,8 +235,8 @@ class ExperimentPipeline(BaseExperimentPipeline):
     def prepare_optimizer(self):
         trainable_params, trainable_param_names, frozen_params, \
                 frozen_param_names = self.filter_trainer_parameters()
-        print(f"Frozen Parameters: {frozen_param_names}")
-        print(f"Trainable Parameters: {trainable_param_names} ")
+        logger.info(f"Frozen Parameters: {frozen_param_names}")
+        logger.info(f"Trainable Parameters: {trainable_param_names} ")
         lr = self.config["learning_rate"]
         weight_decay = self.config["weight_decay"]
         optimizer_class = AdamW # Adam

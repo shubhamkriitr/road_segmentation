@@ -48,16 +48,16 @@ class BaseFactory(object):
         self.resource_map = self.config["resource_map"] if "resource_map" in \
             self.config else {}
     
-    def get(self, resource_name, config=None):
+    def get(self, resource_name, config=None,
+            args_to_pass=[], kwargs_to_pass={}):
         # currently not using config
         try:
-            resource_getter = self.resource_map[resource_name]
+            resource_class = self.resource_map[resource_name]
         except KeyError:
             raise KeyError(f"{resource_name} is not allowed. Please use one of"
                            f" these names: {list(self.resource_map.keys())}")
-        try:
-            return resource_getter(config=config)
-        except TypeError as err:
-            if config is not None:
-                raise err
-        return resource_getter()
+        
+        if config is not None:
+            return resource_class(config=config)
+        
+        return resource_class(*args_to_pass, **kwargs_to_pass)
