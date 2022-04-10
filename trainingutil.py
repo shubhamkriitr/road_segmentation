@@ -330,7 +330,8 @@ class ExperimentPipeline(BaseExperimentPipeline):
             f"[({global_batch_number}){current_epoch}-{current_epoch_batch_number}]"
             f" Loss: {kwargs['loss']}")
         if global_batch_number % self.config["tensorboard_log_frequency"] == 0:
-            self.summary_writer.add_scalar("train/loss", kwargs['loss'], global_batch_number)
+            self.summary_writer.add_scalar("train/loss", kwargs['loss'],
+                                           global_batch_number)
     
     def epoch_callback(self, model: nn.Module, batch_data, global_batch_number,
                     current_epoch, current_epoch_batch_number, **kwargs):
@@ -393,45 +394,33 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
 
     def compute_and_log_evaluation_metrics(self, model, current_epoch,
         eval_type):
-        if eval_type == "test":
-            x = self.test_loader.dataset.x
-            y_true = self.test_loader.dataset.y
-        if eval_type == "val":
-            x = self.val_loader.dataset.x
-            y_true = self.val_loader.dataset.y
-        
-        model_output = None
-        try:
-            model_output = model(x)
-        except Exception as exc:
-            logger.exception(exc)
+        model.eval()
+        eval_loss = 0.
+        with torch.no_grad():
+            predictions = []
+            targets = []
 
-        if hasattr(model, "predict"):
-            y_pred_prob = model.predict(x)
-            if model_output is None:
-                model_output = y_pred_prob
-        else:
-            if model_output is None:
-                model_output = model(x)
-            y_pred_prob = model_output
+            for i, (inp, target) in enumerate(test_dataloader):
+                # move input to cuda if required
+                if device == "cuda":
+                    inp = inp.cuda(non_blocking=True)
+                    target = target.cuda(non_blocking=True)
 
-        if "task_type" in self.config and \
-                self.config["task_type"] == "binary_classification":
-            if torch.max(y_pred_prob) > 1.0 or torch.min(y_pred_prob) < 0.:
-                logger.warning(
-                    "warning!: expected probability but received logits!")
-            y_pred = (y_pred_prob>0.5).type(torch.int8)
-        else:
-            y_pred = torch.argmax(y_pred_prob, axis=1)
-        f1 = f1_score(y_true, y_pred, average="macro")
+                # forward pass
+                pred = model.forward(inp)
+                loss = loss_fn(pred, target)
+                eval_loss += loss.item()
+                predictions.append(pred)
+                targets.append(target)
 
-        logger.info("%s f1 score : %s "% (eval_type, f1))
+            targets = torch.cat(targets, axis=0)
+            predictions = torch.cat(predictions, axis=0)
+            f1_value = f1_score(predictions.to('cpu'), targets.int().to('cpu')[:, 0])
 
-        acc = accuracy_score(y_true, y_pred)
-            
-        loss = self.cost_function(input=model_output, target=y_true)
-        logger.info(f"{eval_type} acc: {acc}")
-        logger.info(f"{eval_type} loss: {loss}")
+            writer.add_scalar("Loss/eval", eval_loss / len(test_dataloader.dataset), epoch)
+            writer.add_scalar("F1", f1_value, epoch)
+            print(f"Evaluation loss after epoch {epoch + 1}/{n_epochs}: {eval_loss / len(test_dataloader.dataset)}")
+            print(f"F1-Score after epoch {epoch + 1}/{n_epochs}: {f1_value}")
         self.summary_writer.add_scalar(f"{eval_type}/loss", loss, current_epoch)
         self.summary_writer.add_scalar(f"{eval_type}/F1", f1, current_epoch)
         self.summary_writer.add_scalar(f"{eval_type}/Accuracy", acc, current_epoch)
@@ -450,7 +439,7 @@ PIPELINE_NAME_TO_CLASS_MAP = {
 
 
 if __name__ == "__main__":
-    DEFAULT_CONFIG_LOCATION = "experiment_configs/experiment_11_a_transfer_cnn_with_residual_block_mit_to_ptb.yaml"
+    DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_00_sample.yaml"
     argparser = ArgumentParser()
     argparser.add_argument("--config", type=str,
                             default=DEFAULT_CONFIG_LOCATION)
