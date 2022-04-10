@@ -396,19 +396,21 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         eval_type):
         model.eval()
         eval_loss = 0.
+        n_epochs = self.config["num_epochs"]
         with torch.no_grad():
             predictions = []
             targets = []
 
-            for i, (inp, target) in enumerate(test_dataloader):
+            for i, (inp, target) in enumerate(self.val_loader):
                 # move input to cuda if required
-                if device == "cuda":
+                if self.config["device"] == "cuda": 
+                    # TODO: take device info from `resolve_device`
                     inp = inp.cuda(non_blocking=True)
                     target = target.cuda(non_blocking=True)
 
                 # forward pass
                 pred = model.forward(inp)
-                loss = loss_fn(pred, target)
+                loss = self.cost_function(pred, target)
                 eval_loss += loss.item()
                 predictions.append(pred)
                 targets.append(target)
@@ -417,15 +419,17 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             predictions = torch.cat(predictions, axis=0)
             f1_value = f1_score(predictions.to('cpu'), targets.int().to('cpu')[:, 0])
 
-            writer.add_scalar("Loss/eval", eval_loss / len(test_dataloader.dataset), epoch)
-            writer.add_scalar("F1", f1_value, epoch)
-            print(f"Evaluation loss after epoch {epoch + 1}/{n_epochs}: {eval_loss / len(test_dataloader.dataset)}")
-            print(f"F1-Score after epoch {epoch + 1}/{n_epochs}: {f1_value}")
-        self.summary_writer.add_scalar(f"{eval_type}/loss", loss, current_epoch)
-        self.summary_writer.add_scalar(f"{eval_type}/F1", f1, current_epoch)
-        self.summary_writer.add_scalar(f"{eval_type}/Accuracy", acc, current_epoch)
+        self.summary_writer.add_scalar(
+            f"{eval_type}/loss", eval_loss / len(self.val_loader.dataset),
+            current_epoch)
+        self.summary_writer.add_scalar(f"{eval_type}/F1", f1_value,
+                                       current_epoch)
+        logger.info(f"Evaluation loss after epoch {current_epoch}/{n_epochs}:"
+                    f" {eval_loss / len(self.val_loader.dataset)}")
+        logger.info(
+            f"F1-Score after epoch {current_epoch}/{n_epochs}: {f1_value}")
         self.summary_writer.flush()
-        return f1, acc, loss, y_pred_prob
+        return f1_value, loss
     
     
         

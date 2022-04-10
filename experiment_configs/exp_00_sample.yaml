@@ -2,6 +2,7 @@ pipeline_class: "ExperimentPipelineForSegmentation" # choose the pipeline
 experiment_metadata:
   description: "This is a sample experiment"
   tag: "exp_00_sample"
+device: "cpu"
 dataloader_util_class_name: "VanillaDataLoaderUtil" # This utility class
 dataloader_root_dir: "data/split" # set root dir to load data from
 shuffle: true
