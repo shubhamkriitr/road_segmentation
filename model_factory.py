@@ -3,10 +3,12 @@ from commonutil import BaseFactory
 
 # models
 from model_resnet50 import (get_frozen_pruned_resnet50, get_pruned_resnet50)
-from unet import UNet, BaselineUNet
+from unet import UNet
+from baseline_unet import BaselineUNet
 from efficient_unet import EfficientUNet
 from model_convnext import (get_pruned_convnext_small, get_pruned_convnext_tiny)
 
+# model mapping
 MODEL_NAME_TO_CLASS_OR_INTIALIZER_MAP = {
     "FrozenPrunedResnet50": get_frozen_pruned_resnet50,
     "PrunedResnet50": get_pruned_resnet50,
@@ -41,7 +43,8 @@ class TrainedModelFactory(ModelFactory):
 
         self.model_weights_path = self.config["model_name_to_weights_path"]
     
-    def get(self, model_name):
+    def get(self, model_name, config=None):
+        # TODO: config not being used currently
         model_class =  super().get(model_name)
         model_weights_path = self.model_weights_path[model_name]
 
@@ -73,6 +76,7 @@ class TrainedModelFactory(ModelFactory):
         
 
 if __name__ == "__main__":
-    model_factory = TrainedModelFactory()
-    model = model_factory.get("CnnWithResidualConnectionPTB")
+    # >>> model_factory = TrainedModelFactory()
+    model_factory = ModelFactory()
+    model = model_factory.get("PrunedResnet50")
     print(model)
