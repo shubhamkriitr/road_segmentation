@@ -3,7 +3,7 @@ import logging
 from argparse import ArgumentParser
 import torch
 import yaml
-from sklearn.metrics import accuracy_score, f1_score
+from torchmetrics import F1Score
 from torch import nn
 from torch.optim.adam import Adam
 from torch.optim.adamw import AdamW
@@ -172,6 +172,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
         self.prepare_optimizer() # call this after model has been initialized
         self.prepare_scheduler()
         self.prepare_cost_function()
+        self.prepare_metrics()
         self.prepare_summary_writer()
         self.prepare_dataloaders()
         self.prepare_batch_callbacks()
@@ -308,6 +309,10 @@ class ExperimentPipeline(BaseExperimentPipeline):
             kwargs_to_pass=kwargs_to_pass
         )
     
+    def prepare_metrics(self):
+        self.metrics = {}
+        self.metrics["F1"] = F1Score(threshold=self.config["threshold_for_f1"])
+        
     def prepare_class_weights_for_cost_function(self):
         # TODO: Add if needed
         return None
@@ -425,7 +430,8 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
 
             targets = torch.cat(targets, axis=0)
             predictions = torch.cat(predictions, axis=0)
-            f1_value = f1_score(predictions.to('cpu'), targets.int().to('cpu')[:, 0])
+            f1_value = self.metrics["F1"](
+                predictions.to('cpu'), targets.int().to('cpu')[:, 0])
 
         self.summary_writer.add_scalar(
             f"{eval_type}/loss", eval_loss / len(self.val_loader.dataset),
