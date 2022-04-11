@@ -7,6 +7,7 @@ from torch import nn
 import torch.functional as F
 from loggingutil import logger
 import commonutil
+import os
 
 PRETAINED_MODEL_PATHS = {
     "torchvision": {
@@ -15,7 +16,18 @@ PRETAINED_MODEL_PATHS = {
 }
 # >>> resnet50 = tvm.resnet50(pretrained=True, progress=True)
 
+def download_model_if_not_available():
+    model_path = PRETAINED_MODEL_PATHS["torchvision"]["resnet50"]
+    model_dir = os.path.abspath(os.path.join(model_path, os.pardir))
+    os.makedirs(model_dir, exist_ok=True)
+    download_url = "https://download.pytorch.org/models/resnet50-0676ba61.pth"
+    if not os.path.exists(model_path):
+        logger.info(f"Downloading resnet50 weights")
+        command = f"wget -c {download_url} -O {model_path}"
+        logger.info(f"Running: `{command}`")
+        os.system(command)
 
+download_model_if_not_available()
 
 
 class PrunedResnet50(ResNet):
