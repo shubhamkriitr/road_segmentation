@@ -253,6 +253,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
                 "params": trainable_params
             }
         )
+        logger.info(f"Using optimizer: {self.optimizer}")
     
     def prepare_scheduler(self):
         if "scheduler" not in self.config:
@@ -264,6 +265,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
             self.scheduler = ReduceLROnPlateau(self.optimizer, 'min')
         else:
             raise NotImplementedError()
+        logger.info(f"Using scheduler: {self.scheduler}")
         
     
     def filter_trainer_parameters(self):

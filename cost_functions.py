@@ -7,11 +7,11 @@ from torch.nn import CrossEntropyLoss
 
 base_bce = torch.nn.BCELoss(reduction='none')
 
-def weighted_bce_loss(y_pred, y_true):
-    y_true = y_true[:, :1]
-    int_loss = base_bce(y_pred, y_true)
-    pred_round = y_pred.detach().round()
-    weights = torch.where((pred_round==0) & (y_true==1), 5, 1)
+def weighted_bce_loss(input, target):
+    target = target[:, :1]
+    int_loss = base_bce(input, target)
+    pred_round = input.detach().round()
+    weights = torch.where((pred_round==0) & (target==1), 5, 1)
     return torch.mean(weights*int_loss)
 
 class Loss(nn.Module):
