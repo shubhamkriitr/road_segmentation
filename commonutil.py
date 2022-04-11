@@ -2,6 +2,8 @@ import os
 import torch
 from pathlib import Path
 from datetime import datetime
+import imageio
+import numpy as np
 # Generic utility code
 
 PROJECTPATH = Path(__file__).parent.parent
@@ -42,6 +44,28 @@ def group_param_names_by_trainability(model):
             frozen_params.append(name)
     return frozen_params, trainable_params
 
+def to_cuda_if_available(pytorch_object):
+    try:
+        return pytorch_object.cuda()
+    except RuntimeError:
+        return pytorch_object
+
+def write_images(model, dataloader, path, threshold):
+    if not os.path.exists(path): os.makedirs(path)
+    for b, (x, y) in enumerate(dataloader):
+        pred = None
+        with torch.no_grad():
+            if next(model.parameters()).is_cuda:
+                x = x.cuda()
+            pred = model(x).cpu()
+        thresholded = torch.where(pred >= threshold, torch.ones_like(pred), torch.zeros_like(pred)).numpy()
+        pred = pred.numpy()
+        y = y.cpu().numpy()[:, :1]
+        assert pred.shape == y.shape
+        for i in range(pred.shape[0]):
+            imageio.imwrite(f"{path}/{b}-{i}.png", (pred[i, 0]*255).astype(np.uint8))
+            imageio.imwrite(f"{path}/{b}-{i}_thresholded.png", (thresholded[i, 0]*255).astype(np.uint8))
+            imageio.imwrite(f"{path}/{b}-{i}_label.png", (y[i, 0]*255).astype(np.uint8))
 class BaseFactory(object):
     def __init__(self, config=None) -> None:
         self.config = {} if config is None else config 

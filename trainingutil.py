@@ -13,6 +13,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from datautil import (DataLoaderUtilFactory)
 from model_factory import ModelFactory
 from commonutil import get_timestamp_str, BaseFactory
+import commonutil
 from loggingutil import logger
 from cost_functions import CostFunctionFactory
 
@@ -311,7 +312,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
     
     def prepare_metrics(self):
         self.metrics = {}
-        self.metrics["F1"] = F1Score(threshold=self.config["threshold_for_f1"])
+        self.metrics["F1"] = F1Score(threshold=self.config["threshold"])
         
     def prepare_class_weights_for_cost_function(self):
         # TODO: Add if needed
@@ -386,10 +387,11 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                   f"{self.best_metric} to {metric_to_use_for_model_selection}")
             self.best_metric = metric_to_use_for_model_selection
             file_path = os.path.join(self.current_experiment_directory,
-            "best_model_{self.config['model_name_tag']}.ckpt")
+            f"best_model_{self.config['model_name_tag']}.ckpt")
             torch.save(model.state_dict(), file_path)
         
-        if (current_epoch % self.config["model_save_frequency"] == 0):
+        if (current_epoch % self.config["model_save_frequency"] == 0)\
+            or (current_epoch == self.config["num_epochs"]):
             file_path = os.path.join(self.current_experiment_directory,
             f"model_{self.config['model_name_tag']}_"\
                 +f"{str(current_epoch).zfill(4)}.ckpt")
@@ -403,6 +405,12 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         
         # don't forget to dump log so far
         self.summary_writer.flush()
+        
+        # save images if asked:
+        if  (current_epoch == self.config["num_epochs"]) and \
+                "save_images" in self.config and self.config["save_images"]:
+            self.save_images()
+
         return self.best_metric
 
     def compute_and_log_evaluation_metrics(self, model, current_epoch,
@@ -444,6 +452,21 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             f"F1-Score after epoch {current_epoch}/{n_epochs}: {f1_value}")
         
         return f1_value, loss
+    
+    def save_images(self):
+        output_dir = os.path.join(
+            self.current_experiment_directory, "output_images"
+        )
+        logger.info(f"Saving images at: {output_dir}")
+        train_output_dir, val_output_dir = (os.path.join(output_dir, p)
+                                            for p in ["train", "val"])
+        os.makedirs(output_dir, exist_ok=False)
+        commonutil.write_images(self.model, self.train_loader,
+                                train_output_dir, self.config["threshold"])
+        commonutil.write_images(self.model, self.val_loader,
+                                val_output_dir, self.config["threshold"])
+        
+        
     
     
         

@@ -14,7 +14,7 @@ model_class_name: "UNet" # The network to use e.g. UNet
 load_from_checkpoint: false
 checkpoint_path: ""
 cost_function_class_name: "BinaryGeneralizeDiceLoss"
-threshold_for_f1: 0.5
+threshold: 0.5
 trainer_class_name: "NetworkTrainer"
 num_epochs: 5
 batch_size: 2
