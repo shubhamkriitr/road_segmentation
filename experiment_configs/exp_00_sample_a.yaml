@@ -2,12 +2,12 @@ pipeline_class: "ExperimentPipelineForSegmentation" # choose the pipeline
 experiment_metadata:
   description: "This is a sample experiment"
   tag: "exp_00_sample_a"
-device: "cpu"
+device: "cpu" # TODO: take device info from `resolve_device`
 dataloader_util_class_name: "VanillaDataLoaderUtil" # This utility class
+# is supposed to return loaders upon invoking its `get_data_loaders`
 dataloader_root_dir: "data/split_mini" # set root dir to load data from
 shuffle: true
 normalize: false
-# is supposed to return loaders upon invoking its `get_data_loaders`
 val_split: 0.2 # TODO: currently NOT being used - It is assumed that dataloader
 # util will give already split data loaders
 model_class_name: "UNet" # The network to use e.g. UNet
