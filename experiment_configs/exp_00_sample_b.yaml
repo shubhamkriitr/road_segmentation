@@ -1,0 +1,33 @@
+pipeline_class: "ExperimentPipelineForSegmentation" # choose the pipeline
+experiment_metadata:
+  description: "This is a sample experiment"
+  tag: "exp_00_sample_b"
+device: "cpu" # TODO: take device info from `resolve_device`
+dataloader_util_class_name: "VanillaDataLoaderUtil" # This utility class
+# is supposed to return loaders upon invoking its `get_data_loaders`
+dataloader_root_dir: "data/split_mini" # set root dir to load data from
+shuffle: true
+normalize: true
+val_split: null # TODO: currently NOT being used - It is assumed that dataloader
+# util will give already split data loaders
+model_class_name: "FrozenPrunedResnet50" # The network to use e.g. UNet
+load_from_checkpoint: false
+checkpoint_path: ""
+cost_function_class_name: "weighted_bce_loss"
+threshold: 0.3
+trainer_class_name: "NetworkTrainer"
+num_epochs: 5
+batch_size: 2
+optimizer_class_name: "Adam"
+learning_rate: 0.01
+scheduler: "ReduceLROnPlateau"
+weight_decay: 0.0000001
+logdir: "runs"
+batch_log_frequency: 2 # Print log after after these many batches
+tensorboard_log_frequency: 1 # Log scalars after these many batches
+model_save_frequency: 3 # frequency in epochs
+model_name_tag: "sample_b" # it will be included in the model file name
+save_images: true
+test_batch_size: 100 # TODO: currently NOT being used
+do_class_weighting: null
+class_weighting_scheme: null

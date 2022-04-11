@@ -2,16 +2,16 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import torch.nn.functional
-from commonutil import resolve_device
-
+from commonutil import resolve_device, BaseFactory
+from torch.nn import CrossEntropyLoss
 
 base_bce = torch.nn.BCELoss(reduction='none')
 
-def weighted_bce_loss(y_pred, y_true):
-    y_true = y_true[:, :1]
-    int_loss = base_bce(y_pred, y_true)
-    pred_round = y_pred.detach().round()
-    weights = torch.where((pred_round==0) & (y_true==1), 5, 1)
+def weighted_bce_loss(input, target):
+    target = target[:, :1]
+    int_loss = base_bce(input, target)
+    pred_round = input.detach().round()
+    weights = torch.where((pred_round==0) & (target==1), 5, 1)
     return torch.mean(weights*int_loss)
 
 class Loss(nn.Module):
@@ -35,8 +35,8 @@ class GeneralizeDiceLoss(WeightedLoss):
     def __init__(self, weight=None, size_average=None, reduce=None, reduction: str = 'mean') -> None:
         super().__init__(weight, size_average, reduce, reduction)
     
-    def forward(self, input_, target):
-        """Assumes input_ and target are of shape: (Batch, Channel, H, W)
+    def forward(self, input, target):
+        """Assumes input and target are of shape: (Batch, Channel, H, W)
         Where each slice along `$i^{th}$` channel is a probabilty map for the
         output class with the id `$i$`.
         """
@@ -46,14 +46,22 @@ class BinaryGeneralizeDiceLoss(Loss):
     def __init__(self, size_average=None, reduce=None, reduction: str = 'mean') -> None:
         super().__init__(size_average, reduce, reduction)
 
-    def forward(self, input_, target):
-        """Assumes input_ and target are of shape: (Batch, 1, H, W)
+    def forward(self, input, target):
+        """Assumes input and target are of shape: (Batch, 1, H, W)
         Where for each item in the batch, the slice along channel 
         is a probabilty map for ouput class with label id `1`.
         """
-        cost = 1 - 2*torch.sum(input_*target)/(torch.sum(input_+target) + 1e-7)
+        cost = 1 - 2*torch.sum(input*target)/(torch.sum(input+target) + 1e-7)
         return cost
 
+class ThresholdedBinaryGeneralizedDiceLoss(BinaryGeneralizeDiceLoss):
+    def __init__(self, threshold=0.3, size_average=None, reduce=None, reduction: str = 'mean') -> None:
+        super().__init__(size_average, reduce, reduction)
+        self.threshold = threshold
+    
+    def forward(self, input, target):
+        input = torch.where(input>self.threshold, 1., 0.)
+        return super().forward(input, target)
 
 class EdgeWeightedBinaryGeneralizeDiceLoss(Loss):
     def __init__(self, edge_weight_factor=10, size_average=None,
@@ -63,33 +71,33 @@ class EdgeWeightedBinaryGeneralizeDiceLoss(Loss):
             edge_weight_factor=edge_weight_factor)
         
 
-    def forward(self, input_, target):
-        """Assumes input_ and target are of shape: (Batch, 1, H, W)
+    def forward(self, input, target):
+        """Assumes input and target are of shape: (Batch, 1, H, W)
         Where for each item in the batch, the slice along channel 
         is a probabilty map for ouput class with label id `1`.
         """
         edge_weights = self.edge_layer(target)
-        cost = 1 - 2*torch.sum(input_*target*edge_weights)\
-                 /  (torch.sum(edge_weights*(input_+target)) + 1e-7)
+        cost = 1 - 2*torch.sum(input*target*edge_weights)\
+                 /  (torch.sum(edge_weights*(input+target)) + 1e-7)
         return cost
 class BinaryGeneralizeDiceLossV2(BinaryGeneralizeDiceLoss):
     def __init__(self, size_average=None, reduce=None, reduction: str = 'mean') -> None:
         super().__init__(size_average, reduce, reduction)
     
-    def forward(self, input_, target):
-        cost =  super().forward(input_, target)
-        cost += super().forward(1 - input_, 1 - target)
+    def forward(self, input, target):
+        cost =  super().forward(input, target)
+        cost += super().forward(1 - input, 1 - target)
         return cost/2.0
 
 class ClassWeightedBinaryGeneralizeDiceLoss(WeightedLoss):
     def __init__(self, weight=None, size_average=None, reduce=None, reduction: str = 'mean') -> None:
         super().__init__(weight, size_average, reduce, reduction)
     
-    def forward(self, input_, target):
-        cost = 1.0 - self.weight[0]*torch.sum(input_*target)/(torch.sum(input_+target) + 1e-7)
-        input_ = 1.0 - input_
+    def forward(self, input, target):
+        cost = 1.0 - self.weight[0]*torch.sum(input*target)/(torch.sum(input+target) + 1e-7)
+        input = 1.0 - input
         target = 1.0 - target
-        cost += - self.weight[0]*torch.sum(input_*target)/(torch.sum(input_+target) + 1e-7)
+        cost += - self.weight[0]*torch.sum(input*target)/(torch.sum(input+target) + 1e-7)
         return cost
 
 
@@ -133,13 +141,33 @@ class EdgeWeightingKernel(nn.Module):
         self.edge_kernel.requires_grad = False
         
 
+COST_FUNCTION_NAME_TO_CLASS_MAP = {
+    "ClassWeightedBinaryGeneralizeDiceLoss":\
+        ClassWeightedBinaryGeneralizeDiceLoss,
+    "BinaryGeneralizeDiceLoss": BinaryGeneralizeDiceLoss,
+    "weighted_bce_loss": lambda : weighted_bce_loss,
+    "ThresholdedBinaryGeneralizedDiceLoss":\
+        ThresholdedBinaryGeneralizedDiceLoss
+    
+}
+
+class CostFunctionFactory(BaseFactory):
+    def __init__(self, config=None) -> None:
+        super().__init__(config)
+        self.resource_map = COST_FUNCTION_NAME_TO_CLASS_MAP
+    
+    def get(self, cost_function_class_name, config=None,
+            args_to_pass=[], kwargs_to_pass={}):
+        return super().get(cost_function_class_name, config,
+                           args_to_pass, kwargs_to_pass)
 if __name__ == "__main__":
     
-
-    def test_1(loss_func, input_, target):
-        print("Input:\n", input_)
+    cf = CostFunctionFactory().get("ClassWeightedBinaryGeneralizeDiceLoss")
+    
+    def test_1(loss_func, input, target):
+        print("Input:\n", input)
         print("target:\n", target)
-        gdl = loss_func(input_, target)
+        gdl = loss_func(input, target)
         print(f"gdl {gdl}")
 
     def run_tests(loss_func):

@@ -14,7 +14,7 @@ from model_resnet50 import(PrunedResnet50, get_pruned_resnet50,
                            get_frozen_pruned_resnet50)
 from model_convnext import get_pruned_convnext_tiny, get_pruned_convnext_small
 from loggingutil import logger
-
+from commonutil import write_images
 # TODO: get cost function from factory instead
 SELECTED_COST_FUNCTION = EdgeWeightedBinaryGeneralizeDiceLoss()
 logger.info(f"SELECTED_COST_FUNCTION = {SELECTED_COST_FUNCTION}")
@@ -178,20 +178,7 @@ def train(model: torch.nn.Module,
 
     return model
 
-def write_images(model, dataloader, path, threshold):
-    if not os.path.exists(path): os.makedirs(path)
-    for b, (x, y) in enumerate(dataloader):
-        pred = None
-        with torch.no_grad():
-            pred = model(x.cuda()).cpu()
-        thresholded = torch.where(pred >= threshold, torch.ones_like(pred), torch.zeros_like(pred)).numpy()
-        pred = pred.numpy()
-        y = y.cpu().numpy()[:, :1]
-        assert pred.shape == y.shape
-        for i in range(pred.shape[0]):
-            imageio.imwrite(f"{path}/{b}-{i}.png", (pred[i, 0]*255).astype(np.uint8))
-            imageio.imwrite(f"{path}/{b}-{i}_thresholded.png", (thresholded[i, 0]*255).astype(np.uint8))
-            imageio.imwrite(f"{path}/{b}-{i}_label.png", (y[i, 0]*255).astype(np.uint8))
+
 
 
 
