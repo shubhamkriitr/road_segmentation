@@ -147,10 +147,10 @@ class CILRoadSegmentationDataset(Dataset):
             assert self.num_samples == sum(is_img(filename) for filename in os.listdir(self.labels_path)), "Number of images does not match number of labels"
 
         if self.base_transformations:
-            assert np.array(list(self.base_transformations.values())).sum() == 1, "Probabilities of transformations should up to 1"
+            assert np.isclose(np.array(list(self.base_transformations.values())).sum(), 1), "Probabilities of transformations should up to 1"
 
         if self.additional_transformations:
-            assert np.array(list(self.additional_transformations.values())).sum() == 1, "Probabilities of transformations should up to 1"
+            assert np.isclose(np.array(list(self.additional_transformations.values())).sum(), 1), "Probabilities of transformations should up to 1"
 
         assert self.num_samples > 0, "No input data was found"
 
