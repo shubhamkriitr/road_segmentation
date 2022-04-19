@@ -10,7 +10,7 @@ shuffle: true
 normalize: true
 val_split: null # TODO: currently NOT being used - It is assumed that dataloader
 # util will give already split data loaders
-model_class_name: "FrozenPrunedResnet50" # The network to use e.g. UNet
+model_class_name: "SplitAndStichPrunedResnet50" # The network to use e.g. UNet
 load_from_checkpoint: false
 checkpoint_path: ""
 cost_function_class_name: "weighted_bce_loss"

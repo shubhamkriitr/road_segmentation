@@ -81,8 +81,8 @@ class NetworkTrainer(BaseTrainer):
         # reset optimizer
         self.optimizer.zero_grad()
 
-        # unpack batch data
-        x, y_true = batch_data
+        # unpack batch data and shift to resovled device (to cuda if available)
+        x, y_true = (t.to(commonutil.resolve_device()) for t in batch_data)
 
         # compute model prediction
         y_pred = self.model(x)
@@ -224,6 +224,9 @@ class ExperimentPipeline(BaseExperimentPipeline):
         # TODO: use model config too (or make it work by creating new class)
         model = ModelFactory().get(self.config["model_class_name"])
         self.model = model
+        
+        # use cuda if available (TODO: decide to use config/resolve device)
+        self.model.to(commonutil.resolve_device())
 
         if self.config["load_from_checkpoint"]:
             checkpoint_path = self.config["checkpoint_path"]
@@ -371,7 +374,8 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             # save the config
             self.save_config()
             with torch.no_grad():
-                self.summary_writer.add_graph(self.model, batch_data[0])
+                self.summary_writer.add_graph(
+                    self.model, batch_data[0].to(commonutil.resolve_device()))
     
         model.eval()
         # 
@@ -482,7 +486,7 @@ PIPELINE_NAME_TO_CLASS_MAP = {
 
 
 if __name__ == "__main__":
-    DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_00_sample.yaml"
+    DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_00_sample_b.yaml"
     argparser = ArgumentParser()
     argparser.add_argument("--config", type=str,
                             default=DEFAULT_CONFIG_LOCATION)

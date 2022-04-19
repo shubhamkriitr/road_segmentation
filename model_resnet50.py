@@ -139,7 +139,27 @@ class FrozenPrunedResnet50(PrunedResnet50):
         
         return False
         
-            
+
+class SplitAndStichPrunedResnet50(PrunedResnet50):
+    def __init__(self) -> None:
+        super().__init__()
+        
+    def preprocess_input(self, x):
+        return torch.reshape(x, 
+                             (x.shape[0]*4, x.shape[1],
+                              x.shape[2]//2, x.shape[3]//2))
+    
+    def postprocess_output(self, y):
+        return torch.reshape(y, 
+                             (y.shape[0]//4, y.shape[1],
+                              y.shape[2]*2, y.shape[3]*2))
+    
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.preprocess_input(x)
+        x =  super().forward(x)
+        x = self.postprocess_output(x)
+        return x
+             
     
 # TODO: add in model factory once decided we are using tht
 def model_getter ( model_class, load_strictly=False):
@@ -165,3 +185,4 @@ def model_getter ( model_class, load_strictly=False):
 
 get_pruned_resnet50 = model_getter(PrunedResnet50, False)
 get_frozen_pruned_resnet50 = model_getter(FrozenPrunedResnet50, False)
+get_split_pruned_resnet50 = model_getter(SplitAndStichPrunedResnet50, False)
