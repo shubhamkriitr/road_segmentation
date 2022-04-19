@@ -430,10 +430,12 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
 
             for i, (inp, target) in enumerate(self.val_loader):
                 # move input to cuda if required
-                if self.config["device"] == "cuda": 
-                    # TODO: take device info from `resolve_device`
-                    inp = inp.cuda(non_blocking=True)
-                    target = target.cuda(non_blocking=True)
+                # >>> if self.config["device"] == "cuda": 
+                # >>>     inp = inp.cuda(non_blocking=True)
+                # >>>     target = target.cuda(non_blocking=True)
+                # TODO: take device info from `resolve_device`
+                inp, target = inp.to(commonutil.resolve_device()), \
+                    target.to(commonutil.resolve_device())
 
                 # forward pass
                 pred = model.forward(inp)
