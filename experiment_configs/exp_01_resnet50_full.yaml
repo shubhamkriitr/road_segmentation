@@ -1,0 +1,34 @@
+pipeline_class: "ExperimentPipelineForSegmentation" # choose the pipeline
+experiment_metadata:
+  description: "Training this model for submission. This is Reset50 model with \
+    pretrained weights (none of its weights are frozen)"
+  tag: "exp_01_resnet50_full"
+device: "cuda" # TODO: take device info from `resolve_device`
+dataloader_util_class_name: "VanillaDataLoaderUtil" # This utility class
+# is supposed to return loaders upon invoking its `get_data_loaders`
+dataloader_root_dir: "data/split" # set root dir to load data from
+shuffle: true
+normalize: false
+val_split: 0.2 # TODO: currently NOT being used - It is assumed that dataloader
+# util will give already split data loaders
+model_class_name: "PrunedResnet50" # The network to use e.g. UNet
+load_from_checkpoint: false
+checkpoint_path: ""
+cost_function_class_name: "BinaryGeneralizeDiceLoss"
+threshold: 0.5
+trainer_class_name: "NetworkTrainer"
+num_epochs: 300
+batch_size: 8
+optimizer_class_name: "AdamW"
+learning_rate: 0.001
+scheduler: null
+weight_decay: 0.0000001
+logdir: "runs"
+batch_log_frequency: 1 # Print log after after these many batches
+tensorboard_log_frequency: 1 # Log scalars after these many batches
+model_save_frequency: 2 # frequency in epochs
+model_name_tag: "sample" # it will be included in the model file name
+save_images: true
+test_batch_size: 100 # TODO: currently NOT being used
+do_class_weighting: null
+class_weighting_scheme: null
