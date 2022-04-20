@@ -143,6 +143,7 @@ class EdgeWeightingKernel(nn.Module):
 class SoftBootstrappedDiceLoss(Loss):
     def __init__(self, beta=0.9, size_average=None, reduce=None, reduction: str = 'mean') -> None:
         super().__init__(size_average, reduce, reduction)
+        self.beta = beta
 
     def forward(self, input, target):
         comb = self.beta*target + (1-self.beta)*input
@@ -151,11 +152,12 @@ class SoftBootstrappedDiceLoss(Loss):
         return cost
 
 class EdgeWeightedSoftBootstrappedDiceLoss(Loss):
-    def __init__(self, edge_weight_factor=10, size_average=None,
+    def __init__(self, beta=0.9, edge_weight_factor=10, size_average=None,
                  reduce=None, reduction: str = 'mean') -> None:
         super().__init__(size_average, reduce, reduction)
         self.edge_layer = EdgeWeightingKernel(
             edge_weight_factor=edge_weight_factor)
+        self.beta = beta
         
 
     def forward(self, input, target):
