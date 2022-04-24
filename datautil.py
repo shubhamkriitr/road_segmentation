@@ -139,7 +139,7 @@ class CILRoadSegmentationDataset(Dataset):
         self._inspect_rootdir()
 
     def _inspect_rootdir(self):
-        is_img = lambda x: '.png' in x
+        is_img = lambda x: '.png' in x or '.jpg' in x
         self.image_names = [f for f in os.listdir(self.images_path) if is_img(f)]
         self.num_samples = len(self.image_names)
 
@@ -173,7 +173,8 @@ class CILRoadSegmentationDataset(Dataset):
         input_image = np.clip(input_image / 255, a_min=0, a_max=1 - 1e-7)
 
         if self.labels_path:
-            groundtruth = self.load_image(os.path.join(self.labels_path, self.image_names[index]))
+            name = self.image_names[index].rsplit('.', 1)[0] + '.png'
+            groundtruth = self.load_image(os.path.join(self.labels_path, name))
 
             # NOTE: creating probability map from the ground truth image
             groundtruth = torch.tensor(groundtruth) / 255
@@ -252,10 +253,28 @@ class VanillaDataLoaderUtil(object):
             normalize=normalize
         )
         return train_loader, val_loader, None # no test loader
+
+class DeepGlobeLoaderUtil(object):
+    def __init__(self, config=None) -> None:
+        self.config = config # currently not in use (adding for extension)#TODO 
+
+    def get_data_loaders(self, root_dir: str,
+                               batch_size: int = 10,
+                               shuffle: bool = True,
+                               normalize: bool = True):
+        train_loader, val_loader = get_train_test_dataloaders(
+            root_dir=root_dir,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            normalize=normalize
+        )
+        train_loader.dataset.normalize_transform = SegNormalize(mean=[0.4117, 0.3884, 0.2957], std=[0.1580, 0.1283, 0.1235])
+        return train_loader, val_loader, None # no test loader
         
 # Add newly created specialized loader utils here        
 DATALOADER_UTIL_CLASS_MAP = {
-    "VanillaDataLoaderUtil": VanillaDataLoaderUtil
+    "VanillaDataLoaderUtil": VanillaDataLoaderUtil,
+    "DeepGlobeLoaderUtil": DeepGlobeLoaderUtil
 }
 
 class DataLoaderUtilFactory(BaseFactory):

@@ -140,6 +140,37 @@ class EdgeWeightingKernel(nn.Module):
         self.edge_kernel = kernel.view(1, 1, 3, 3).repeat(1, self.num_channels, 1, 1)
         self.edge_kernel.requires_grad = False
         
+class SoftBootstrappedDiceLoss(Loss):
+    def __init__(self, beta=0.9, size_average=None, reduce=None, reduction: str = 'mean') -> None:
+        super().__init__(size_average, reduce, reduction)
+        self.beta = beta
+
+    def forward(self, input, target):
+        comb = self.beta*target + (1-self.beta)*input
+        cost = 1 - (1 + 2*torch.sum(input*comb))\
+                / (1 + torch.sum(input*input+target*target))
+        return cost
+
+class EdgeWeightedSoftBootstrappedDiceLoss(Loss):
+    def __init__(self, beta=0.9, edge_weight_factor=10, size_average=None,
+                 reduce=None, reduction: str = 'mean') -> None:
+        super().__init__(size_average, reduce, reduction)
+        self.edge_layer = EdgeWeightingKernel(
+            edge_weight_factor=edge_weight_factor)
+        self.beta = beta
+        
+
+    def forward(self, input, target):
+        """Assumes input and target are of shape: (Batch, 1, H, W)
+        Where for each item in the batch, the slice along channel 
+        is a probabilty map for ouput class with label id `1`.
+        """
+        edge_weights = self.edge_layer(target)
+        comb = self.beta*target + (1-self.beta)*input
+        cost = 1 - (1 + 2*torch.sum(edge_weights*input*comb))\
+                / (1 + torch.sum(edge_weights*(input*input+target*target)))
+        return cost
+
 
 COST_FUNCTION_NAME_TO_CLASS_MAP = {
     "ClassWeightedBinaryGeneralizeDiceLoss":\
@@ -147,7 +178,10 @@ COST_FUNCTION_NAME_TO_CLASS_MAP = {
     "BinaryGeneralizeDiceLoss": BinaryGeneralizeDiceLoss,
     "weighted_bce_loss": lambda : weighted_bce_loss,
     "ThresholdedBinaryGeneralizedDiceLoss":\
-        ThresholdedBinaryGeneralizedDiceLoss
+        ThresholdedBinaryGeneralizedDiceLoss,
+    "SoftBootstrappedDiceLoss": SoftBootstrappedDiceLoss,
+    "EdgeWeightedSoftBootstrappedDiceLoss":\
+        EdgeWeightedSoftBootstrappedDiceLoss
     
 }
 
