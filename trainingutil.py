@@ -477,13 +477,24 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         
     
     
+class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
+    def __init__(self, config) -> None:
+        super().__init__(config)
+    
+    def run_experiment(self):
+        val_f1, _ = self.compute_and_log_evaluation_metrics(
+            self.model, 0, "val")
+        test_f1, _ = self.compute_and_log_evaluation_metrics(
+            self.model, 0, "test")
+        self.save_images()
         
         
 
         
 PIPELINE_NAME_TO_CLASS_MAP = {
     "ExperimentPipeline": ExperimentPipeline,
-    "ExperimentPipelineForSegmentation": ExperimentPipelineForSegmentation
+    "ExperimentPipelineForSegmentation": ExperimentPipelineForSegmentation,
+    "EvaluationPipelineForSegmentation": EvaluationPipelineForSegmentation
 }
 
 
