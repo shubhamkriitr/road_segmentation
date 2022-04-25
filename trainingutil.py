@@ -507,9 +507,10 @@ class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
                                             for p in ["val", "test"])
         os.makedirs(output_dir, exist_ok=False)
         commonutil.write_images(self.model, self.test_loader,
-                                test_output_dir, self.config["threshold"])
-        commonutil.write_images(self.model, self.val_loader,
-                                val_output_dir, self.config["threshold"])
+                                test_output_dir, self.config["threshold"],
+                                save_submission_files=True, offset=144)
+        # commonutil.write_images(self.model, self.val_loader,
+        #                         val_output_dir, self.config["threshold"])
         
         
         

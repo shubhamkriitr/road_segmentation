@@ -7,7 +7,8 @@ device: "cuda" # TODO: take device info from `resolve_device`
 dataloader_util_class_name: "VanillaDataLoaderUtil" # This utility class
 # is supposed to return loaders upon invoking its `get_data_loaders`
 dataloader_root_dir: "data/split" # set root dir to load data from
-shuffle: true
+#test_image_offset: 144 # used only during evaluation on test data: TODO : use this field in code
+shuffle: false
 normalize: false
 val_split: 0.2 # TODO: currently NOT being used - It is assumed that dataloader
 # util will give already split data loaders

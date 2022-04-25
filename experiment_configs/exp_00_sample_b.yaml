@@ -6,13 +6,13 @@ device: "cpu" # TODO: take device info from `resolve_device`
 dataloader_util_class_name: "VanillaTestDataLoaderUtil" # This utility class
 # is supposed to return loaders upon invoking its `get_data_loaders`
 dataloader_root_dir: "data/split_eval" # set root dir to load data from
-shuffle: false # MUST SET IT TO `false`
+shuffle: false # MUST SET IT TO `false` during evalutaion
 normalize: false # better to keep it `false` during evaluation
 val_split: null # TODO: currently NOT being used - It is assumed that dataloader
 # util will give already split data loaders
 model_class_name: "PrunedResnet50" # The network to use e.g. UNet
 load_from_checkpoint: true # make it `true` during evaluation
-checkpoint_path: "runs/a/best_model_resnet50_full.ckpt"
+checkpoint_path: "runs/cluster_a/best_model_resnet50_full.ckpt"
 cost_function_class_name: "weighted_bce_loss"
 threshold: 0.3
 trainer_class_name: "NetworkTrainer"

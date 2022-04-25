@@ -5,6 +5,7 @@ from datetime import datetime
 import imageio
 import numpy as np
 # Generic utility code
+from loggingutil import logger
 
 PROJECTPATH = Path(__file__).parent.parent
 
@@ -50,8 +51,14 @@ def to_cuda_if_available(pytorch_object):
     except RuntimeError:
         return pytorch_object
 
-def write_images(model, dataloader, path, threshold):
+def write_images(model, dataloader, path, threshold,
+                 save_submission_files=False, offset=144):
     if not os.path.exists(path): os.makedirs(path)
+    submit_dir = os.path.join(path, "submit", "predictions")
+    sample_index = -1
+    if save_submission_files:
+        os.makedirs(submit_dir)
+        logger.info(f"len(dataloader.dataset) = {len(dataloader.dataset)}")
     for b, (x, y) in enumerate(dataloader):
         pred = None
         with torch.no_grad():
@@ -63,9 +70,18 @@ def write_images(model, dataloader, path, threshold):
         y = y.cpu().numpy()[:, :1]
         assert pred.shape == y.shape
         for i in range(pred.shape[0]):
+            sample_index += 1
             imageio.imwrite(f"{path}/{b}-{i}.png", (pred[i, 0]*255).astype(np.uint8))
             imageio.imwrite(f"{path}/{b}-{i}_thresholded.png", (thresholded[i, 0]*255).astype(np.uint8))
             imageio.imwrite(f"{path}/{b}-{i}_label.png", (y[i, 0]*255).astype(np.uint8))
+            if save_submission_files:
+                image_filename = f"satimage_{offset+sample_index}.png"
+                logger.info(f"Saving image: {image_filename}")
+                imageio.imwrite(f"{submit_dir}/{image_filename}",
+                                (thresholded[i, 0]*255).astype(np.uint8))
+            
+            
+            
 class BaseFactory(object):
     def __init__(self, config=None) -> None:
         self.config = {} if config is None else config 
