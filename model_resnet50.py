@@ -143,16 +143,48 @@ class FrozenPrunedResnet50(PrunedResnet50):
 class SplitAndStichPrunedResnet50(PrunedResnet50):
     def __init__(self) -> None:
         super().__init__()
+        self.split_factor = 4
         
-    def preprocess_input(self, x):
-        return torch.reshape(x, 
-                             (x.shape[0]*4, x.shape[1],
-                              x.shape[2]//2, x.shape[3]//2))
+    def preprocess_input(self, x: torch.Tensor):
+        n = self.split_factor # num of slice along a given dimension
+        w_i = x.shape[2]//n
+        w_j = x.shape[3]//n
+        s = (x.shape[0]*n*n, x.shape[1],
+                              w_i, w_j)
+        
+        m = torch.zeros(size=s)
+        
+        # FIXME: find torch's inbuilt functions to unroll 
+        # like this
+        k = 0
+        for p in range(x.shape[0]):
+            for i in range(n): 
+                for j in range(n):
+                    m[k] = x[p, :, i*w_i:(i+1)*w_i, j*w_j:(j+1)*w_j]
+                    k += 1
+        return m
     
     def postprocess_output(self, y):
-        return torch.reshape(y, 
-                             (y.shape[0]//4, y.shape[1],
-                              y.shape[2]*2, y.shape[3]*2))
+        #>>> y = (B*n*n, 1, h//n, w//n)
+        n = self.split_factor
+        nsq = n*n
+        w_i = y.shape[2]
+        w_j = y.shape[3]
+        h = w_i*n
+        w = w_j*n
+        assert y.shape[0] % nsq == 0
+        B = y.shape[0]//nsq
+        
+        s = (B, y.shape[1], h, w)
+        m = torch.zeros(size=s)
+        
+        k = 0
+        for p in range(B):
+            for i in range(n): 
+                for j in range(n):
+                    m[p, :, i*w_i:(i+1)*w_i, j*w_j:(j+1)*w_j] = y[k, :, : ,:]
+                    k += 1
+        return m
     
     def forward(self, x: Tensor) -> Tensor:
         x = self.preprocess_input(x)

@@ -524,7 +524,7 @@ PIPELINE_NAME_TO_CLASS_MAP = {
 
 
 if __name__ == "__main__":
-    DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_00_sample_b.yaml"
+    DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_02_resnet50_split.yaml"
     argparser = ArgumentParser()
     argparser.add_argument("--config", type=str,
                             default=DEFAULT_CONFIG_LOCATION)
