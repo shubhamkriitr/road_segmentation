@@ -12,7 +12,7 @@ from commonutil import BaseFactory
 
 # TODO: better to take this from run config sigleton
 TENSOR_FLOAT_DTYPE = torch.float32
-
+GROUNDTRUTH_SHAPE = (400, 400)
 # Set random seed
 torch.manual_seed(10)
 random.seed(10)
@@ -181,7 +181,9 @@ class CILRoadSegmentationDataset(Dataset):
             # groundtruth = torch.stack([groundtruth, 1 - groundtruth], dim=0)
             groundtruth = groundtruth.unsqueeze(0)
         else:
-            groundtruth = None
+            # NOTE: returning dummy value for test dataset (where groundtruths
+            # are not known)
+            groundtruth = torch.ones(size=GROUNDTRUTH_SHAPE).unsqueeze(0)
 
         # To tensors
         input_image = self.to_tensor(input_image).transpose(1, 2).transpose(0, 1)
@@ -234,6 +236,30 @@ def get_train_test_dataloaders(root_dir: str,
     test_dataset = get_dataset(os.path.join(root_dir, 'test'), None, None, normalize, image_folder, label_folder)
     return torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle), torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=shuffle)
 
+def get_validation_and_test_dataloaders(root_dir: str,
+                               batch_size: int = 10,
+                               shuffle: bool = False,
+                               normalize: bool = False,
+                               base_transformations=None,
+                               additional_transformations=None,
+                               image_folder="images",
+                               label_folder="groundtruth"):
+    # TODO merge with get_train_test_dataloaders
+    assert "val" in os.listdir(root_dir) and "test" in os.listdir(root_dir),\
+        "You must provide the path to the split/ folder"
+    
+    test_dataset = get_dataset(
+        os.path.join(root_dir, 'test'),base_transformations, 
+        additional_transformations, normalize, image_folder, None)
+    val_dataset = get_dataset(
+        os.path.join(root_dir, 'val'), base_transformations, 
+        additional_transformations, normalize, image_folder, label_folder)
+    val_loader = torch.utils.data.DataLoader(
+        val_dataset, batch_size=batch_size, shuffle=shuffle)
+    test_loader = torch.utils.data.DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=shuffle)
+    
+    return val_loader, test_loader
 
 class VanillaDataLoaderUtil(object):
     def __init__(self, config=None) -> None:
@@ -254,6 +280,24 @@ class VanillaDataLoaderUtil(object):
         )
         return train_loader, val_loader, None # no test loader
 
+class VanillaTestDataLoaderUtil(VanillaDataLoaderUtil):
+    def __init__(self, config=None) -> None:
+        super().__init__(config)
+    
+    def get_data_loaders(self, root_dir: str,
+                               batch_size: int = 10,
+                               shuffle: bool = True,
+                               normalize: bool = True):
+        """
+        Returns tuple of (train_loader, val_loader, test_loader)
+        """
+        val_loader, test_loader = get_validation_and_test_dataloaders(
+            root_dir=root_dir,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            normalize=normalize
+        )
+        return None, val_loader, test_loader # no train loader
 class DeepGlobeLoaderUtil(object):
     def __init__(self, config=None) -> None:
         self.config = config # currently not in use (adding for extension)#TODO 
@@ -274,7 +318,8 @@ class DeepGlobeLoaderUtil(object):
 # Add newly created specialized loader utils here        
 DATALOADER_UTIL_CLASS_MAP = {
     "VanillaDataLoaderUtil": VanillaDataLoaderUtil,
-    "DeepGlobeLoaderUtil": DeepGlobeLoaderUtil
+    "DeepGlobeLoaderUtil": DeepGlobeLoaderUtil, 
+    "VanillaTestDataLoaderUtil": VanillaTestDataLoaderUtil
 }
 
 class DataLoaderUtilFactory(BaseFactory):

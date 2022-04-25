@@ -231,7 +231,9 @@ class ExperimentPipeline(BaseExperimentPipeline):
         if self.config["load_from_checkpoint"]:
             checkpoint_path = self.config["checkpoint_path"]
             logger.info(f"Loading from checkpoint: {checkpoint_path}")
-            self.model.load_state_dict(torch.load(checkpoint_path))
+            self.model.load_state_dict(
+                            torch.load(checkpoint_path,
+                                map_location=commonutil.resolve_device()))
             logger.info(str(self.model))
             logger.info(f"Model Loaded")
         
@@ -424,11 +426,18 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         model.eval()
         eval_loss = 0.
         n_epochs = self.config["num_epochs"]
+        _loader = None
+        if eval_type == "val":
+            _loader = self.val_loader
+        elif eval_type == "test":
+            _loader = self.test_loader
+        else:
+            raise AssertionError(f"Unsupported eval type: {eval_type}")
         with torch.no_grad():
             predictions = []
             targets = []
 
-            for i, (inp, target) in enumerate(self.val_loader):
+            for i, (inp, target) in enumerate(_loader):
                 # move input to cuda if required
                 # >>> if self.config["device"] == "cuda": 
                 # >>>     inp = inp.cuda(non_blocking=True)
@@ -450,12 +459,12 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                 predictions.to('cpu'), targets.int().to('cpu')[:, 0])
 
         self.summary_writer.add_scalar(
-            f"{eval_type}/loss", eval_loss / len(self.val_loader.dataset),
+            f"{eval_type}/loss", eval_loss / len(_loader.dataset),
             current_epoch)
         self.summary_writer.add_scalar(f"{eval_type}/F1", f1_value,
                                        current_epoch)
         logger.info(f"Evaluation loss after epoch {current_epoch}/{n_epochs}:"
-                    f" {eval_loss / len(self.val_loader.dataset)}")
+                    f" {eval_loss / len(_loader.dataset)}")
         logger.info(
             f"F1-Score after epoch {current_epoch}/{n_epochs}: {f1_value}")
         
@@ -482,11 +491,26 @@ class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
         super().__init__(config)
     
     def run_experiment(self):
+        self.save_config()
         val_f1, _ = self.compute_and_log_evaluation_metrics(
             self.model, 0, "val")
         test_f1, _ = self.compute_and_log_evaluation_metrics(
             self.model, 0, "test")
         self.save_images()
+    
+    def save_images(self):
+        output_dir = os.path.join(
+            self.current_experiment_directory, "output_images"
+        )
+        logger.info(f"Saving images at: {output_dir}")
+        val_output_dir, test_output_dir = (os.path.join(output_dir, p)
+                                            for p in ["val", "test"])
+        os.makedirs(output_dir, exist_ok=False)
+        commonutil.write_images(self.model, self.test_loader,
+                                test_output_dir, self.config["threshold"])
+        commonutil.write_images(self.model, self.val_loader,
+                                val_output_dir, self.config["threshold"])
+        
         
         
 
