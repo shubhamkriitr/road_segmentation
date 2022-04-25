@@ -143,7 +143,7 @@ class FrozenPrunedResnet50(PrunedResnet50):
 class SplitAndStichPrunedResnet50(PrunedResnet50):
     def __init__(self) -> None:
         super().__init__()
-        self.split_factor = 4
+        self.split_factor = 2
         
     def preprocess_input(self, x: torch.Tensor):
         n = self.split_factor # num of slice along a given dimension
@@ -162,6 +162,8 @@ class SplitAndStichPrunedResnet50(PrunedResnet50):
                 for j in range(n):
                     m[k] = x[p, :, i*w_i:(i+1)*w_i, j*w_j:(j+1)*w_j]
                     k += 1
+                    
+        m = m.to(device=x.device)
         return m
     
     def postprocess_output(self, y):
@@ -184,6 +186,7 @@ class SplitAndStichPrunedResnet50(PrunedResnet50):
                 for j in range(n):
                     m[p, :, i*w_i:(i+1)*w_i, j*w_j:(j+1)*w_j] = y[k, :, : ,:]
                     k += 1
+        m = m.to(y.device)
         return m
     
     def forward(self, x: Tensor) -> Tensor:
