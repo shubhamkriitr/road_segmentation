@@ -1,20 +1,18 @@
 pipeline_class: "EvaluationPipelineForSegmentation" # choose the pipeline
 experiment_metadata:
-  description: "Training this model for submission. This is Reset50 model with \
-    pretrained weights (none of its weights are frozen)"
-  tag: "exp_01_resnet50_full"
+  description: "Resnet50 that works on smaller chunks and stitch the output back"
+  tag: "eval_02_resnet50_split"
 device: "cuda" # TODO: take device info from `resolve_device`
-dataloader_util_class_name: "VanillaDataLoaderUtil" # This utility class
+dataloader_util_class_name: "VanillaTestDataLoaderUtil" # This utility class
 # is supposed to return loaders upon invoking its `get_data_loaders`
-dataloader_root_dir: "data/split" # set root dir to load data from
-#test_image_offset: 144 # used only during evaluation on test data: TODO : use this field in code
+dataloader_root_dir: "data/split_eval" # set root dir to load data from
 shuffle: false
 normalize: false
 val_split: 0.2 # TODO: currently NOT being used - It is assumed that dataloader
 # util will give already split data loaders
-model_class_name: "PrunedResnet50" # The network to use e.g. UNet
+model_class_name: "SplitAndStichPrunedResnet50" # The network to use e.g. UNet
 load_from_checkpoint: true
-checkpoint_path: "runs/2022-04-24_174941__exp_01_resnet50_full/best_model_resnet50_full.ckpt"
+checkpoint_path: "../../model_archive/2022-04-25_051934__exp_02_resnet50_split/best_model_resnet50_split.ckpt"
 cost_function_class_name: "BinaryGeneralizeDiceLoss"
 threshold: 0.5
 trainer_class_name: "NetworkTrainer"
@@ -28,7 +26,7 @@ logdir: "runs"
 batch_log_frequency: 1 # Print log after after these many batches
 tensorboard_log_frequency: 1 # Log scalars after these many batches
 model_save_frequency: 2 # frequency in epochs
-model_name_tag: "resnet50_full" # it will be included in the model file name
+model_name_tag: "resnet50_split" # it will be included in the model file name
 save_images: true
 test_batch_size: 100 # TODO: currently NOT being used
 do_class_weighting: null

@@ -195,6 +195,15 @@ class SplitAndStichPrunedResnet50(PrunedResnet50):
         x = self.postprocess_output(x)
         return x
              
+class SplitAndStichPrunedResnet50MultiScale(SplitAndStichPrunedResnet50):
+    def __init__(self) -> None:
+        super().__init__()
+    
+    def forward(self, x: Tensor) -> Tensor:
+        x_small =  super().forward(x) # at small scale
+        x = super(SplitAndStichPrunedResnet50, self).forward(x)
+        x = (x + x_small)/2
+        return x
     
 # TODO: add in model factory once decided we are using tht
 def model_getter ( model_class, load_strictly=False):
@@ -221,3 +230,5 @@ def model_getter ( model_class, load_strictly=False):
 get_pruned_resnet50 = model_getter(PrunedResnet50, False)
 get_frozen_pruned_resnet50 = model_getter(FrozenPrunedResnet50, False)
 get_split_pruned_resnet50 = model_getter(SplitAndStichPrunedResnet50, False)
+get_split_pruned_multiscale_resnet50 \
+    = model_getter(SplitAndStichPrunedResnet50MultiScale, False)
