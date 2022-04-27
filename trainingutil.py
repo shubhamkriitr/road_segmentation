@@ -3,7 +3,7 @@ import logging
 from argparse import ArgumentParser
 import torch
 import yaml
-from torchmetrics import F1Score
+from torchmetrics import F1Score, Accuracy, Precision, Recall
 from torch import nn
 from torch.optim.adam import Adam
 from torch.optim.adamw import AdamW
@@ -320,6 +320,9 @@ class ExperimentPipeline(BaseExperimentPipeline):
     def prepare_metrics(self):
         self.metrics = {}
         self.metrics["F1"] = F1Score(threshold=self.config["threshold"])
+        self.metrics["Accuracy"] = Accuracy(threshold=self.config["threshold"])
+        self.metrics["Recall"] = Recall(threshold=self.config["threshold"])
+        self.metrics["Precision"] = Precision(threshold=self.config["threshold"])
         
     def prepare_class_weights_for_cost_function(self):
         # TODO: Add if needed
@@ -382,7 +385,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         model.eval()
         # 
 
-        val_f1, _ = self.compute_and_log_evaluation_metrics(
+        val_f1, val_prec, val_recall, val_acc, _ = self.compute_and_log_evaluation_metrics(
             model, current_epoch, "val")
     
         # TODO: metric can also be pulled in config
@@ -456,19 +459,31 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             targets = torch.cat(targets, axis=0)
             predictions = torch.cat(predictions, axis=0)
             f1_value = self.metrics["F1"](
-                predictions.to('cpu'), targets.int().to('cpu')[:, 0])
+                predictions.to('cpu').flatten(), targets.int().to('cpu')[:, 0].flatten())
+            precision_value = self.metrics["Precision"](
+                predictions.to('cpu').flatten(), targets.int().to('cpu')[:, 0].flatten())
+            acc_value = self.metrics["Accuracy"](
+                predictions.to('cpu').flatten(), targets.int().to('cpu')[:, 0].flatten())
+            recall_value = self.metrics["Recall"](
+                predictions.to('cpu').flatten(), targets.int().to('cpu')[:, 0].flatten())
 
         self.summary_writer.add_scalar(
             f"{eval_type}/loss", eval_loss / len(_loader.dataset),
             current_epoch)
         self.summary_writer.add_scalar(f"{eval_type}/F1", f1_value,
                                        current_epoch)
+        self.summary_writer.add_scalar(f"{eval_type}/Precision", precision_value,
+                                       current_epoch)
+        self.summary_writer.add_scalar(f"{eval_type}/Recall", recall_value,
+                                       current_epoch)
+        self.summary_writer.add_scalar(f"{eval_type}/Accuracy", acc_value,
+                                       current_epoch)
         logger.info(f"Evaluation loss after epoch {current_epoch}/{n_epochs}:"
                     f" {eval_loss / len(_loader.dataset)}")
         logger.info(
-            f"F1-Score after epoch {current_epoch}/{n_epochs}: {f1_value}")
+            f"Evaluation metrics after epoch {current_epoch}/{n_epochs}: F1: {f1_value} | Acc: {acc_value} | Precision: {precision_value} | Recall: {recall_value}")
         
-        return f1_value, loss
+        return f1_value, precision_value, recall_value, acc_value, loss
     
     def save_images(self):
         output_dir = os.path.join(
@@ -492,9 +507,9 @@ class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
     
     def run_experiment(self):
         self.save_config()
-        val_f1, _ = self.compute_and_log_evaluation_metrics(
+        val_f1, val_prec, val_recall, val_acc, _ = self.compute_and_log_evaluation_metrics(
             self.model, 0, "val")
-        test_f1, _ = self.compute_and_log_evaluation_metrics(
+        test_f1, test_prec, test_recall, test_acc, _ = self.compute_and_log_evaluation_metrics(
             self.model, 0, "test")
         self.save_images()
     
