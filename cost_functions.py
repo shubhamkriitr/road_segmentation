@@ -69,7 +69,7 @@ class PatchedBinaryGeneralizeDiceLoss(Loss):
         """
         # Apply mean pooling to input and target using the patch size used for evaluation
         patched_input = self.pooling(input)
-        patched_target = self.pooling(target)
+        patched_target = self.pooling(target).round()
         cost = 1 - 2*torch.sum(patched_input*patched_target)/(torch.sum(patched_input+patched_target) + 1e-7)
         return cost
 
