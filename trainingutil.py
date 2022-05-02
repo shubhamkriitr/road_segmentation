@@ -506,13 +506,13 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             predictions, targets)
 
         f1_value_patches = self.metrics["F1"](
-            predictions, targets)
+            predictions_patches, targets_patches)
         precision_value_patches = self.metrics["Precision"](
-            predictions, targets)
+            predictions_patches, targets_patches)
         acc_value_patches = self.metrics["Accuracy"](
-            predictions, targets)
+            predictions_patches, targets_patches)
         recall_value_patches = self.metrics["Recall"](
-            predictions, targets)
+            predictions_patches, targets_patches)
 
         self.summary_writer.add_scalar(
             f"{eval_type}/loss", eval_loss / len(_loader.dataset),
