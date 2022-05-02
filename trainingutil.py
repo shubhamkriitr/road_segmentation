@@ -426,6 +426,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
 
     def compute_and_log_evaluation_metrics(self, model, current_epoch,
         eval_type):
+        pooling = torch.nn.AvgPool2d(kernel_size=16, stride=16)  # 16 is evaluation patch size
         model.eval()
         eval_loss = 0.
         n_epochs = self.config["num_epochs"]
