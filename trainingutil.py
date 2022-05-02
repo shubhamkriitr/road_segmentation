@@ -16,13 +16,15 @@ from commonutil import get_timestamp_str, BaseFactory
 import commonutil
 from loggingutil import logger
 from cost_functions import CostFunctionFactory
+import subprocess
+from submit.mask_to_submission import python_execution as mask_to_submission
 
 
 class BaseTrainer(object):
 
     def __init__(self, model: nn.Module, dataloader, cost_function,
                  optimizer: Optimizer,
-                batch_callbacks=[], epoch_callbacks=[], config={}) -> None:
+                 batch_callbacks=[], epoch_callbacks=[], config={}) -> None:
         self.model = model
         self.cost_function = cost_function
         self.dataloader = dataloader
@@ -35,7 +37,6 @@ class BaseTrainer(object):
         self.num_epochs = self.config["num_epochs"]
         self.optimizer = optimizer
 
-
     def train(self):
         global_batch_number = 0
         current_epoch_batch_number = 0
@@ -47,22 +48,22 @@ class BaseTrainer(object):
 
                 # perform one training step
                 self.training_step(batch_data, global_batch_number,
-                                    current_epoch, current_epoch_batch_number)
+                                   current_epoch, current_epoch_batch_number)
             self.invoke_epoch_callbacks(self.model, batch_data, global_batch_number,
-                                current_epoch, current_epoch_batch_number)
-            
-    def training_step(self, batch_data,  global_batch_number, current_epoch,
-                    current_epoch_batch_number):
-        
+                                        current_epoch, current_epoch_batch_number)
+
+    def training_step(self, batch_data, global_batch_number, current_epoch,
+                      current_epoch_batch_number):
+
         # make one training step
-        
+
         raise NotImplementedError()
 
     def invoke_epoch_callbacks(self, model, batch_data, global_batch_number,
-                                current_epoch, current_epoch_batch_number):
-        self.invoke_callbacks(self.epoch_callbacks, 
-                    [self.model, batch_data, global_batch_number,
-                    current_epoch, current_epoch_batch_number], {})
+                               current_epoch, current_epoch_batch_number):
+        self.invoke_callbacks(self.epoch_callbacks,
+                              [self.model, batch_data, global_batch_number,
+                               current_epoch, current_epoch_batch_number], {})
 
     def invoke_callbacks(self, callbacks, args: list, kwargs: dict):
         for callback in callbacks:
@@ -71,11 +72,12 @@ class BaseTrainer(object):
             except Exception as exc:
                 logger.exception(exc)
 
+
 class NetworkTrainer(BaseTrainer):
 
     def training_step(self, batch_data, global_batch_number,
-                        current_epoch, current_epoch_batch_number):
-        # make sure training mode is on 
+                      current_epoch, current_epoch_batch_number):
+        # make sure training mode is on
         self.model.train()
 
         # reset optimizer
@@ -96,9 +98,9 @@ class NetworkTrainer(BaseTrainer):
         # take optimizer step
         self.optimizer.step()
 
-        self.invoke_callbacks(self.batch_callbacks, 
-                    [self.model, batch_data, global_batch_number,
-                    current_epoch, current_epoch_batch_number], {"loss": loss})
+        self.invoke_callbacks(self.batch_callbacks,
+                              [self.model, batch_data, global_batch_number,
+                               current_epoch, current_epoch_batch_number], {"loss": loss})
 
 
 class BaseExperimentPipeline(object):
@@ -109,13 +111,12 @@ class BaseExperimentPipeline(object):
     def __init__(self, config) -> None:
         self.config = None
         self.initialize_config(config)
-    
+
     def initialize_config(self, config):
         config = self.load_config(config)
 
         # TODO: add/ override some params here
         self.config = config
-
 
     def prepare_experiment(self):
         raise NotImplementedError()
@@ -132,37 +133,43 @@ class BaseExperimentPipeline(object):
                 config_data = yaml.load(f, Loader=yaml.FullLoader)
             return config_data
 
+
 # dictionary to refer to class by name
 # (to be used in config)
 TRAINER_NAME_TO_CLASS_MAP = {
     "NetworkTrainer": NetworkTrainer
 }
 
+
 # Factory class to get trainer class by name
 class TrainerFactory(BaseFactory):
     def __init__(self, config=None) -> None:
         super().__init__(config)
         self.resource_map = TRAINER_NAME_TO_CLASS_MAP
-     
+
     def get(self, trainer_name, config=None,
             args_to_pass=[], kwargs_to_pass={}):
         return super().get(trainer_name, config,
-                            args_to_pass=[], kwargs_to_pass={})
+                           args_to_pass=[], kwargs_to_pass={})
+
 
 # TODO: may move optimizer part to another file
 OPTIMIZER_NAME_TO_CLASS_OR_INITIALIZER_MAP = {
     "Adam": Adam,
     "AdamW": AdamW
 }
+
+
 class OptimizerFactory(BaseFactory):
     def __init__(self, config=None) -> None:
         super().__init__(config)
         self.resource_map = OPTIMIZER_NAME_TO_CLASS_OR_INITIALIZER_MAP
-    
+
     def get(self, optimizer_name, config=None,
-                args_to_pass=[], kwargs_to_pass={}):
+            args_to_pass=[], kwargs_to_pass={}):
         return super().get(optimizer_name, config,
-            args_to_pass, kwargs_to_pass)
+                           args_to_pass, kwargs_to_pass)
+
 
 class ExperimentPipeline(BaseExperimentPipeline):
     def __init__(self, config) -> None:
@@ -170,7 +177,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
 
     def prepare_experiment(self):
         self.prepare_model()
-        self.prepare_optimizer() # call this after model has been initialized
+        self.prepare_optimizer()  # call this after model has been initialized
         self.prepare_scheduler()
         self.prepare_cost_function()
         self.prepare_metrics()
@@ -181,20 +188,17 @@ class ExperimentPipeline(BaseExperimentPipeline):
 
         self.trainer = self.prepare_trainer()
 
-
     def prepare_dataloaders(self):
         dataloader_util_class_name = self.config["dataloader_util_class_name"]
         train_batch_size = self.config["batch_size"]
 
         train_loader, val_loader, test_loader \
-        = DataLoaderUtilFactory()\
-            .get(dataloader_util_class_name, config=None)\
-            .get_data_loaders(root_dir=self.config["dataloader_root_dir"],
+            = DataLoaderUtilFactory() \
+            .get(dataloader_util_class_name, config=None) \
+            .get_data_loaders(root_dir=self.config["data_root_dir"],
                               batch_size=train_batch_size,
                               shuffle=self.config["shuffle"],
                               normalize=self.config["normalize"])
-            
-        
 
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -204,27 +208,26 @@ class ExperimentPipeline(BaseExperimentPipeline):
     def prepare_trainer(self):
         trainer_class = TrainerFactory().get_uninitialized(
             self.config["trainer_class_name"])
-        
+
         trainer = trainer_class(model=self.model,
-                    dataloader=self.train_loader,
-                    cost_function=self.cost_function,
-                    optimizer=self.optimizer,
-                    batch_callbacks=self.batch_callbacks,
-                    epoch_callbacks=self.epoch_callbacks,
-                    config={
-                        "num_epochs": self.config["num_epochs"]
-                        }
-                    )
+                                dataloader=self.train_loader,
+                                cost_function=self.cost_function,
+                                optimizer=self.optimizer,
+                                batch_callbacks=self.batch_callbacks,
+                                epoch_callbacks=self.epoch_callbacks,
+                                config={
+                                    "num_epochs": self.config["num_epochs"]
+                                }
+                                )
 
         self.trainer = trainer
         return trainer
-    
 
     def prepare_model(self):
         # TODO: use model config too (or make it work by creating new class)
         model = ModelFactory().get(self.config["model_class_name"])
         self.model = model
-        
+
         # use cuda if available (TODO: decide to use config/resolve device)
         self.model.to(commonutil.resolve_device())
 
@@ -232,22 +235,22 @@ class ExperimentPipeline(BaseExperimentPipeline):
             checkpoint_path = self.config["checkpoint_path"]
             logger.info(f"Loading from checkpoint: {checkpoint_path}")
             self.model.load_state_dict(
-                            torch.load(checkpoint_path,
-                                map_location=commonutil.resolve_device()))
+                torch.load(checkpoint_path,
+                           map_location=commonutil.resolve_device()))
             logger.info(str(self.model))
             logger.info(f"Model Loaded")
-        
+
         return self.model
-    
+
     def prepare_optimizer(self):
         trainable_params, trainable_param_names, frozen_params, \
-                frozen_param_names = self.filter_trainer_parameters()
+        frozen_param_names = self.filter_trainer_parameters()
         logger.info(f"Frozen Parameters: {frozen_param_names}")
         logger.info(f"Trainable Parameters: {trainable_param_names} ")
         lr = self.config["learning_rate"]
         weight_decay = self.config["weight_decay"]
-        # TODO: Discuss and Add subfields (2nd level nesting) in the experminet 
-        # config (yaml files) to pass args and kwargs if needed 
+        # TODO: Discuss and Add subfields (2nd level nesting) in the experminet
+        # config (yaml files) to pass args and kwargs if needed
         self.optimizer = OptimizerFactory().get(
             self.config["optimizer_class_name"],
             config=None,
@@ -259,7 +262,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
             }
         )
         logger.info(f"Using optimizer: {self.optimizer}")
-    
+
     def prepare_scheduler(self):
         if "scheduler" not in self.config:
             return
@@ -271,8 +274,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
         else:
             raise NotImplementedError()
         logger.info(f"Using scheduler: {self.scheduler}")
-        
-    
+
     def filter_trainer_parameters(self):
         trainable_params = []
         trainable_param_names = []
@@ -285,22 +287,22 @@ class ExperimentPipeline(BaseExperimentPipeline):
             else:
                 frozen_params.append(param)
                 frozen_param_names.append(name)
-        
+
         return trainable_params, trainable_param_names, frozen_params, \
-                frozen_param_names
+               frozen_param_names
 
     def prepare_summary_writer(self):
         experiment_tag = self.config["experiment_metadata"]["tag"]
         timestamp = get_timestamp_str()
         self.current_experiment_directory = os.path.join(
-            self.config["logdir"],timestamp+"_"+experiment_tag)
+            self.config["logdir"], timestamp + "_" + experiment_tag)
 
         os.makedirs(self.current_experiment_directory, exist_ok=True)
         self.current_experiment_log_directory = os.path.join(
             self.current_experiment_directory, "logs"
         )
         os.makedirs(self.current_experiment_log_directory, exist_ok=True)
-        
+
         self.summary_writer = SummaryWriter(
             log_dir=self.current_experiment_log_directory)
 
@@ -309,25 +311,24 @@ class ExperimentPipeline(BaseExperimentPipeline):
         kwargs_to_pass = {}
         if class_weights is not None:
             kwargs_to_pass["weight"] = class_weights
-        
+
         self.cost_function = CostFunctionFactory().get(
             self.config["cost_function_class_name"],
             config=None,
             args_to_pass=[],
             kwargs_to_pass=kwargs_to_pass
         )
-    
+
     def prepare_metrics(self):
         self.metrics = {}
         self.metrics["F1"] = F1Score(num_classes=1, threshold=self.config["threshold"], average="weighted")
         self.metrics["Accuracy"] = Accuracy(num_classes=1, threshold=self.config["threshold"], average="weighted")
         self.metrics["Recall"] = Recall(num_classes=1, threshold=self.config["threshold"], average="weighted")
         self.metrics["Precision"] = Precision(num_classes=1, threshold=self.config["threshold"], average="weighted")
-        
+
     def prepare_class_weights_for_cost_function(self):
         # TODO: Add if needed
         return None
-        
 
     def prepare_batch_callbacks(self):
         self.batch_callbacks = [self.batch_callback]
@@ -337,35 +338,64 @@ class ExperimentPipeline(BaseExperimentPipeline):
 
     def run_experiment(self):
         self.trainer.train()
-    
+
+        if self.config.get("create_submission"):
+            self.create_submission()
+
     def batch_callback(self, model, batch_data, global_batch_number,
-                    current_epoch, current_epoch_batch_number, **kwargs):
-        
+                       current_epoch, current_epoch_batch_number, **kwargs):
+
         if global_batch_number % self.config["batch_log_frequency"] == 0:
             logger.info(
-            f"[({global_batch_number}){current_epoch}-{current_epoch_batch_number}]"
-            f" Loss: {kwargs['loss']}")
+                f"[({global_batch_number}){current_epoch}-{current_epoch_batch_number}]"
+                f" Loss: {kwargs['loss']}")
         if global_batch_number % self.config["tensorboard_log_frequency"] == 0:
             self.summary_writer.add_scalar("train/loss", kwargs['loss'],
                                            global_batch_number)
-    
+
     def epoch_callback(self, model: nn.Module, batch_data, global_batch_number,
-                    current_epoch, current_epoch_batch_number, **kwargs):
-        if current_epoch == 1: # the epoch just finished
+                       current_epoch, current_epoch_batch_number, **kwargs):
+        if current_epoch == 1:  # the epoch just finished
             # save the config
             self.save_config()
-    
+
         model.eval()
 
     def save_config(self):
         try:
             file_path = os.path.join(self.current_experiment_directory,
-                                    "config.yaml")
+                                     "config.yaml")
             with open(file_path, 'w') as f:
                 yaml.dump(self.config, f)
         except Exception as exc:
-            logger.exception(exc)       
+            logger.exception(exc)
 
+    def create_submission(self):
+        logger.info("======== Creating submission file ========")
+
+        # Load best model
+        self.model.load_state_dict(
+            torch.load(
+                os.path.join(self.current_experiment_directory, f"best_model_{self.config['model_name_tag']}.ckpt"),
+                map_location=commonutil.resolve_device()))
+
+        # Save images
+        output_dir = os.path.join(
+            self.current_experiment_directory, "output_images"
+        )
+        logger.info(f"Saving test images at: {output_dir}")
+        test_output_dir = (os.path.join(output_dir, "test"))
+
+        os.makedirs(output_dir, exist_ok=False)
+        commonutil.write_images(self.model, self.test_loader,
+                                test_output_dir, self.config["threshold"],
+                                save_submission_files=True, offset=144)
+
+        # Create CSV file
+        mask_to_submission(base_dir=os.path.join(test_output_dir, "submit/predictions"),
+                           submission_filename=os.path.join(self.current_experiment_directory, "to_upload.csv"))
+        logger.info(
+            "========> Submision file exported to {}".format(os.path.join(test_output_dir, "submit/to_upload.csv")))
 
 
 class ExperimentPipelineForSegmentation(ExperimentPipeline):
@@ -374,58 +404,58 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         self.best_metric = None
 
     def epoch_callback(self, model: nn.Module, batch_data, global_batch_number,
-     current_epoch, current_epoch_batch_number, **kwargs):
-        if current_epoch == 1: # the epoch just finished
+                       current_epoch, current_epoch_batch_number, **kwargs):
+        if current_epoch == 1:  # the epoch just finished
             # save the config
             self.save_config()
             with torch.no_grad():
                 self.summary_writer.add_graph(
                     self.model, batch_data[0].to(commonutil.resolve_device()))
-    
+
         model.eval()
-        # 
+        #
 
         val_f1, val_prec, val_recall, val_acc, _ = self.compute_and_log_evaluation_metrics(
             model, current_epoch, "val")
-    
+
         # TODO: metric can also be pulled in config
-        metric_to_use_for_model_selection = val_f1 
+        metric_to_use_for_model_selection = val_f1
         metric_name = "Validation F1-Score"
-        
+
         if self.best_metric is None or \
-             (self.best_metric < metric_to_use_for_model_selection):
+                (self.best_metric < metric_to_use_for_model_selection):
             logger.info(f"Saving model: {metric_name} changed from "
-                  f"{self.best_metric} to {metric_to_use_for_model_selection}")
+                        f"{self.best_metric} to {metric_to_use_for_model_selection}")
             self.best_metric = metric_to_use_for_model_selection
             file_path = os.path.join(self.current_experiment_directory,
-            f"best_model_{self.config['model_name_tag']}.ckpt")
+                                     f"best_model_{self.config['model_name_tag']}.ckpt")
             torch.save(model.state_dict(), file_path)
-        
-        if (current_epoch % self.config["model_save_frequency"] == 0)\
-            or (current_epoch == self.config["num_epochs"]):
+
+        if (current_epoch % self.config["model_save_frequency"] == 0) \
+                or (current_epoch == self.config["num_epochs"]):
             file_path = os.path.join(self.current_experiment_directory,
-            f"model_{self.config['model_name_tag']}_"\
-                +f"{str(current_epoch).zfill(4)}.ckpt")
+                                     f"model_{self.config['model_name_tag']}_" \
+                                     + f"{str(current_epoch).zfill(4)}.ckpt")
             torch.save(model.state_dict(), file_path)
 
         if hasattr(self, "scheduler"):
             self.scheduler.step(metric_to_use_for_model_selection)
             next_lr = [group['lr'] for group in self.optimizer.param_groups][0]
             self.summary_writer.add_scalar("lr", next_lr,
-             current_epoch)
-        
+                                           current_epoch)
+
         # don't forget to dump log so far
         self.summary_writer.flush()
-        
+
         # save images if asked:
-        if  (current_epoch == self.config["num_epochs"]) and \
+        if (current_epoch == self.config["num_epochs"]) and \
                 "save_images" in self.config and self.config["save_images"]:
             self.save_images()
 
         return self.best_metric
 
     def compute_and_log_evaluation_metrics(self, model, current_epoch,
-        eval_type):
+                                           eval_type):
         pooling = torch.nn.AvgPool2d(kernel_size=16, stride=16)  # 16 is evaluation patch size
         model.eval()
         eval_loss = 0.
@@ -443,12 +473,12 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
 
             for i, (inp, target) in enumerate(_loader):
                 # move input to cuda if required
-                # >>> if self.config["device"] == "cuda": 
+                # >>> if self.config["device"] == "cuda":
                 # >>>     inp = inp.cuda(non_blocking=True)
                 # >>>     target = target.cuda(non_blocking=True)
                 # TODO: take device info from `resolve_device`
                 inp, target = inp.to(commonutil.resolve_device()), \
-                    target.to(commonutil.resolve_device())
+                              target.to(commonutil.resolve_device())
 
                 # forward pass
                 pred = model.forward(inp)
@@ -460,12 +490,11 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         targets = torch.cat(targets, axis=0)
         predictions = torch.cat(predictions, axis=0)
 
-        if self.config.get("compute_loss_on_patches"):
-            predictions = pooling(predictions).to('cpu').flatten()
-            targets = pooling(targets).round().int().to('cpu')[:, 0].flatten()
-        else:
-            predictions = predictions.to('cpu').flatten()
-            targets = targets.int().to('cpu')[:, 0].flatten()
+        predictions_patches = pooling(predictions).to('cpu').flatten()
+        targets_patches = pooling(targets).round().int().to('cpu')[:, 0].flatten()
+
+        predictions = predictions.to('cpu').flatten()
+        targets = targets.int().to('cpu')[:, 0].flatten()
 
         f1_value = self.metrics["F1"](
             predictions, targets)
@@ -474,6 +503,15 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         acc_value = self.metrics["Accuracy"](
             predictions, targets)
         recall_value = self.metrics["Recall"](
+            predictions, targets)
+
+        f1_value_patches = self.metrics["F1"](
+            predictions, targets)
+        precision_value_patches = self.metrics["Precision"](
+            predictions, targets)
+        acc_value_patches = self.metrics["Accuracy"](
+            predictions, targets)
+        recall_value_patches = self.metrics["Recall"](
             predictions, targets)
 
         self.summary_writer.add_scalar(
@@ -487,13 +525,21 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                                        current_epoch)
         self.summary_writer.add_scalar(f"{eval_type}/Accuracy", acc_value,
                                        current_epoch)
+        self.summary_writer.add_scalar(f"{eval_type}/F1_patches", f1_value_patches,
+                                       current_epoch)
+        self.summary_writer.add_scalar(f"{eval_type}/Precision_patches", precision_value_patches,
+                                       current_epoch)
+        self.summary_writer.add_scalar(f"{eval_type}/Recall_patches", recall_value_patches,
+                                       current_epoch)
+        self.summary_writer.add_scalar(f"{eval_type}/Accuracy_patches", acc_value_patches,
+                                       current_epoch)
         logger.info(f"Evaluation loss after epoch {current_epoch}/{n_epochs}:"
                     f" {eval_loss / len(_loader.dataset)}")
         logger.info(
-            f"""Evaluation metrics after epoch {current_epoch}/{n_epochs} {"(on 16x16 patches)" if self.config.get("compute_loss_on_patches") else "(at pixel level)"}:\n=> F1: {f1_value} Acc: {acc_value} | Precision: {precision_value} | Recall: {recall_value}\n------------------------""")
+            f"""Evaluation metrics after epoch {current_epoch}/{n_epochs}:\nPixel-level => F1: {f1_value} Acc: {acc_value} | Precision: {precision_value} | Recall: {recall_value}\nPatch-level => F1: {f1_value_patches} Acc: {acc_value_patches} | Precision: {precision_value_patches} | Recall: {recall_value_patches}\n------------------------""")
 
         return f1_value, precision_value, recall_value, acc_value, loss
-    
+
     def save_images(self):
         output_dir = os.path.join(
             self.current_experiment_directory, "output_images"
@@ -506,14 +552,12 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                                 train_output_dir, self.config["threshold"])
         commonutil.write_images(self.model, self.val_loader,
                                 val_output_dir, self.config["threshold"])
-        
-        
-    
-    
+
+
 class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
     def __init__(self, config) -> None:
         super().__init__(config)
-    
+
     def run_experiment(self):
         self.save_config()
         val_f1, val_prec, val_recall, val_acc, _ = self.compute_and_log_evaluation_metrics(
@@ -521,45 +565,40 @@ class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
         test_f1, test_prec, test_recall, test_acc, _ = self.compute_and_log_evaluation_metrics(
             self.model, 0, "test")
         self.save_images()
-    
+
     def save_images(self):
         output_dir = os.path.join(
             self.current_experiment_directory, "output_images"
         )
         logger.info(f"Saving images at: {output_dir}")
         val_output_dir, test_output_dir = (os.path.join(output_dir, p)
-                                            for p in ["val", "test"])
+                                           for p in ["val", "test"])
         os.makedirs(output_dir, exist_ok=False)
         commonutil.write_images(self.model, self.test_loader,
                                 test_output_dir, self.config["threshold"],
                                 save_submission_files=True, offset=144)
         # commonutil.write_images(self.model, self.val_loader,
         #                         val_output_dir, self.config["threshold"])
-        
-        
-        
 
-        
+
 PIPELINE_NAME_TO_CLASS_MAP = {
     "ExperimentPipeline": ExperimentPipeline,
     "ExperimentPipelineForSegmentation": ExperimentPipelineForSegmentation,
     "EvaluationPipelineForSegmentation": EvaluationPipelineForSegmentation
 }
 
-
 if __name__ == "__main__":
     DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_02_resnet50_split.yaml"
     argparser = ArgumentParser()
     argparser.add_argument("--config", type=str,
-                            default=DEFAULT_CONFIG_LOCATION)
+                           default=DEFAULT_CONFIG_LOCATION)
     args = argparser.parse_args()
-    
+
     config_data = None
     with open(args.config, 'r', encoding="utf-8") as f:
         config_data = yaml.load(f, Loader=yaml.FullLoader)
-    
 
-    pipeline_class = PIPELINE_NAME_TO_CLASS_MAP[ config_data["pipeline_class"]]
+    pipeline_class = PIPELINE_NAME_TO_CLASS_MAP[config_data["pipeline_class"]]
     pipeline = pipeline_class(config=config_data)
     pipeline.prepare_experiment()
     pipeline.run_experiment()

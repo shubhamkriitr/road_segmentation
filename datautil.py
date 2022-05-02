@@ -116,7 +116,8 @@ class CILRoadSegmentationDataset(Dataset):
                  root_dir: str,
                  image_folder="images",
                  label_folder="groundtruth",  # Set to none if no supervision
-                 base_transformations=default_base_transformations,  # Dictionary where key is class to be applied, value is the probability
+                 base_transformations=default_base_transformations,
+                 # Dictionary where key is class to be applied, value is the probability
                  additional_transformations=default_additional_transformations,
                  normalize=True):
 
@@ -144,13 +145,16 @@ class CILRoadSegmentationDataset(Dataset):
         self.num_samples = len(self.image_names)
 
         if self.labels_path:
-            assert self.num_samples == sum(is_img(filename) for filename in os.listdir(self.labels_path)), "Number of images does not match number of labels"
+            assert self.num_samples == sum(is_img(filename) for filename in os.listdir(
+                self.labels_path)), "Number of images does not match number of labels"
 
         if self.base_transformations:
-            assert np.isclose(np.array(list(self.base_transformations.values())).sum(), 1), "Probabilities of transformations should up to 1"
+            assert np.isclose(np.array(list(self.base_transformations.values())).sum(),
+                              1), "Probabilities of transformations should up to 1"
 
         if self.additional_transformations:
-            assert np.isclose(np.array(list(self.additional_transformations.values())).sum(), 1), "Probabilities of transformations should up to 1"
+            assert np.isclose(np.array(list(self.additional_transformations.values())).sum(),
+                              1), "Probabilities of transformations should up to 1"
 
         assert self.num_samples > 0, "No input data was found"
 
@@ -193,11 +197,13 @@ class CILRoadSegmentationDataset(Dataset):
 
         if self.base_transformations and self.labels_path:
             # Get transform according to probabilities
-            transform = np.random.choice(list(self.base_transformations.keys()), size=1, p=list(self.base_transformations.values()))[0]
+            transform = np.random.choice(list(self.base_transformations.keys()), size=1,
+                                         p=list(self.base_transformations.values()))[0]
             input_image, groundtruth = transform(input_image, groundtruth)
 
             if self.additional_transformations:
-                transform = np.random.choice(list(self.additional_transformations.keys()), size=1, p=list(self.additional_transformations.values()))[0]
+                transform = np.random.choice(list(self.additional_transformations.keys()), size=1,
+                                             p=list(self.additional_transformations.values()))[0]
                 input_image, groundtruth = transform(input_image, groundtruth)
 
         if self.normalize:
@@ -212,8 +218,10 @@ def get_dataset(root_dir: str,
                 normalize=True,
                 image_folder="images",
                 label_folder="groundtruth"):
-    base_transformations = default_base_transformations if base_transformations == "default" else base_transformations if type(base_transformations) is dict else None
-    additional_transformations = default_additional_transformations if additional_transformations == "default" else additional_transformations if type(additional_transformations) is dict else None
+    base_transformations = default_base_transformations if base_transformations == "default" else base_transformations if type(
+        base_transformations) is dict else None
+    additional_transformations = default_additional_transformations if additional_transformations == "default" else additional_transformations if type(
+        additional_transformations) is dict else None
 
     return CILRoadSegmentationDataset(root_dir=root_dir,
                                       base_transformations=base_transformations,
@@ -231,63 +239,99 @@ def get_train_test_dataloaders(root_dir: str,
                                additional_transformations="default",
                                image_folder="images",
                                label_folder="groundtruth"):
-    assert "train" in os.listdir(root_dir) and "test" in os.listdir(root_dir), "You must provide the path to the split/ folder"
-    train_dataset = get_dataset(os.path.join(root_dir, 'train'), base_transformations, additional_transformations, normalize, image_folder, label_folder)
+    assert "train" in os.listdir(root_dir) and "test" in os.listdir(
+        root_dir), "You must provide the path to the split/ folder"
+    train_dataset = get_dataset(os.path.join(root_dir, 'train'), base_transformations, additional_transformations,
+                                normalize, image_folder, label_folder)
     test_dataset = get_dataset(os.path.join(root_dir, 'test'), None, None, normalize, image_folder, label_folder)
-    return torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle), torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=shuffle)
+    return torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
+                                       shuffle=shuffle), torch.utils.data.DataLoader(test_dataset,
+                                                                                     batch_size=batch_size,
+                                                                                     shuffle=shuffle)
+
+
+def get_train_val_test_dataloaders(root_dir: str,
+                                   batch_size: int = 10,
+                                   shuffle: bool = True,
+                                   normalize: bool = True,
+                                   base_transformations="default",
+                                   additional_transformations="default",
+                                   image_folder="images",
+                                   label_folder="groundtruth"):
+    assert "split" in os.listdir(root_dir) and "test" in os.listdir(
+        root_dir), "You must provide the path to the root data folder. In it there should be a /split and /test folder"
+    train_path = os.path.join(root_dir, 'split')
+    test_path = os.path.join(root_dir, 'test')
+    train_dataset = get_dataset(os.path.join(train_path, 'train'), base_transformations, additional_transformations,
+                                normalize, image_folder, label_folder)
+    validation_dataset = get_dataset(os.path.join(train_path, 'test'), None, None, normalize, image_folder,
+                                     label_folder)
+
+    # Load test data
+    test_dataset = get_dataset(test_path, None, None, normalize, image_folder, None)
+
+    return torch.utils.data.DataLoader(train_dataset, batch_size=batch_size,
+                                       shuffle=shuffle), torch.utils.data.DataLoader(validation_dataset,
+                                                                                     batch_size=batch_size,
+                                                                                     shuffle=shuffle), torch.utils.data.DataLoader(
+        test_dataset, batch_size=batch_size, shuffle=False)
+
 
 def get_validation_and_test_dataloaders(root_dir: str,
-                               batch_size: int = 10,
-                               shuffle: bool = False,
-                               normalize: bool = False,
-                               base_transformations=None,
-                               additional_transformations=None,
-                               image_folder="images",
-                               label_folder="groundtruth"):
+                                        batch_size: int = 10,
+                                        shuffle: bool = False,
+                                        normalize: bool = False,
+                                        base_transformations=None,
+                                        additional_transformations=None,
+                                        image_folder="images",
+                                        label_folder="groundtruth"):
     # TODO merge with get_train_test_dataloaders
-    assert "val" in os.listdir(root_dir) and "test" in os.listdir(root_dir),\
+    assert "val" in os.listdir(root_dir) and "test" in os.listdir(root_dir), \
         "You must provide the path to the split/ folder"
-    
+
     test_dataset = get_dataset(
-        os.path.join(root_dir, 'test'),base_transformations, 
+        os.path.join(root_dir, 'test'), base_transformations,
         additional_transformations, normalize, image_folder, None)
     val_dataset = get_dataset(
-        os.path.join(root_dir, 'val'), base_transformations, 
+        os.path.join(root_dir, 'val'), base_transformations,
         additional_transformations, normalize, image_folder, label_folder)
     val_loader = torch.utils.data.DataLoader(
         val_dataset, batch_size=batch_size, shuffle=shuffle)
     test_loader = torch.utils.data.DataLoader(
         test_dataset, batch_size=batch_size, shuffle=shuffle)
-    
+
     return val_loader, test_loader
+
 
 class VanillaDataLoaderUtil(object):
     def __init__(self, config=None) -> None:
-        self.config = config # currently not in use (adding for extension)#TODO 
+        self.config = config  # currently not in use (adding for extension)#TODO
 
     def get_data_loaders(self, root_dir: str,
-                               batch_size: int = 10,
-                               shuffle: bool = True,
-                               normalize: bool = True):
+                         batch_size: int = 10,
+                         shuffle: bool = True,
+                         normalize: bool = True):
         """
         Returns tuple of (train_loader, val_loader, test_loader)
         """
-        train_loader, val_loader = get_train_test_dataloaders(
+        train_loader, val_loader, test_loader = get_train_val_test_dataloaders(
             root_dir=root_dir,
             batch_size=batch_size,
             shuffle=shuffle,
             normalize=normalize
         )
-        return train_loader, val_loader, None # no test loader
+
+        return train_loader, val_loader, test_loader  # no test loader
+
 
 class VanillaTestDataLoaderUtil(VanillaDataLoaderUtil):
     def __init__(self, config=None) -> None:
         super().__init__(config)
-    
+
     def get_data_loaders(self, root_dir: str,
-                               batch_size: int = 10,
-                               shuffle: bool = True,
-                               normalize: bool = True):
+                         batch_size: int = 10,
+                         shuffle: bool = True,
+                         normalize: bool = True):
         """
         Returns tuple of (train_loader, val_loader, test_loader)
         """
@@ -297,41 +341,47 @@ class VanillaTestDataLoaderUtil(VanillaDataLoaderUtil):
             shuffle=shuffle,
             normalize=normalize
         )
-        return None, val_loader, test_loader # no train loader
+        return None, val_loader, test_loader  # no train loader
+
+
 class DeepGlobeLoaderUtil(object):
     def __init__(self, config=None) -> None:
-        self.config = config # currently not in use (adding for extension)#TODO 
+        self.config = config  # currently not in use (adding for extension)#TODO
 
     def get_data_loaders(self, root_dir: str,
-                               batch_size: int = 10,
-                               shuffle: bool = True,
-                               normalize: bool = True):
+                         batch_size: int = 10,
+                         shuffle: bool = True,
+                         normalize: bool = True):
         train_loader, val_loader = get_train_test_dataloaders(
             root_dir=root_dir,
             batch_size=batch_size,
             shuffle=shuffle,
             normalize=normalize
         )
-        train_loader.dataset.normalize_transform = SegNormalize(mean=[0.4117, 0.3884, 0.2957], std=[0.1580, 0.1283, 0.1235])
-        return train_loader, val_loader, None # no test loader
-        
-# Add newly created specialized loader utils here        
+        train_loader.dataset.normalize_transform = SegNormalize(mean=[0.4117, 0.3884, 0.2957],
+                                                                std=[0.1580, 0.1283, 0.1235])
+        return train_loader, val_loader, None  # no test loader
+
+
+# Add newly created specialized loader utils here
 DATALOADER_UTIL_CLASS_MAP = {
     "VanillaDataLoaderUtil": VanillaDataLoaderUtil,
-    "DeepGlobeLoaderUtil": DeepGlobeLoaderUtil, 
+    "DeepGlobeLoaderUtil": DeepGlobeLoaderUtil,
     "VanillaTestDataLoaderUtil": VanillaTestDataLoaderUtil
 }
+
 
 class DataLoaderUtilFactory(BaseFactory):
     def __init__(self, config=None) -> None:
         super().__init__(config)
         self.resource_map = DATALOADER_UTIL_CLASS_MAP
-    
+
     def get(self, dataloader_util_class_name, config=None,
             args_to_pass=[], kwargs_to_pass={}):
         return super().get(dataloader_util_class_name, config,
-            args_to_pass, kwargs_to_pass)
-        
+                           args_to_pass, kwargs_to_pass)
+
+
 """
 >>>  # Usage example
 >>>  
