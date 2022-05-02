@@ -65,13 +65,7 @@ def masks_to_submission(submission_filename, mask_dir, *image_filenames):
         for fn in image_filenames[0:]:
             f.writelines('{}\n'.format(s) for s in mask_to_submission_strings(fn, mask_dir=mask_dir))
 
-def main_script():
-    argparser = ArgumentParser()
-    argparser.add_argument("--base_dir", type=str, required=True)
-    argparser.add_argument("--submission_filename", type=str, required=True)
-
-    args = argparser.parse_args()
-
+def main_script(args):
     image_filenames = [os.path.join(args.base_dir, name) for name in os.listdir(args.base_dir)]
     masks_to_submission(args.submission_filename, "", *image_filenames)
 
@@ -80,4 +74,10 @@ def python_execution(base_dir: str, submission_filename: str):
     masks_to_submission(submission_filename, "", *image_filenames)
 
 if __name__ == '__main__':
-    app.run(main_script)
+    argparser = ArgumentParser()
+    argparser.add_argument("--base_dir", type=str, required=True)
+    argparser.add_argument("--submission_filename", type=str, required=True)
+
+    args = argparser.parse_args()
+
+    main_script(args)
