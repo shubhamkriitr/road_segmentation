@@ -141,7 +141,7 @@ class CILRoadSegmentationDataset(Dataset):
 
     def _inspect_rootdir(self):
         is_img = lambda x: '.png' in x or '.jpg' in x
-        self.image_names = [f for f in os.listdir(self.images_path) if is_img(f)]
+        self.image_names = sorted([f for f in os.listdir(self.images_path) if is_img(f)])
         self.num_samples = len(self.image_names)
 
         if self.labels_path:
