@@ -490,9 +490,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         logger.info(f"Evaluation loss after epoch {current_epoch}/{n_epochs}:"
                     f" {eval_loss / len(_loader.dataset)}")
         logger.info(
-            f"""Evaluation metrics after epoch {current_epoch}/{n_epochs} {"(on 16x16 patches)" if self.config.get("compute_loss_on_patches") else "(at pixel level)"}: 
-                        => F1: {f1_value} Acc: {acc_value} | Precision: {precision_value} | Recall: {recall_value}
-                        ------------------------""")
+            f"""Evaluation metrics after epoch {current_epoch}/{n_epochs} {"(on 16x16 patches)" if self.config.get("compute_loss_on_patches") else "(at pixel level)"}:\n=> F1: {f1_value} Acc: {acc_value} | Precision: {precision_value} | Recall: {recall_value}\n------------------------""")
 
         return f1_value, precision_value, recall_value, acc_value, loss
     
