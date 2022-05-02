@@ -502,7 +502,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                 POOLING => F1: {f1_value_pool} Acc: {acc_value_pool} | Precision: {precision_value_pool} | Recall: {recall_value_pool}
                 ------------------------""")
 
-        return f1_value, precision_value, recall_value, acc_value, loss
+        return f1_value_pool, precision_value_pool, recall_value_pool, acc_value_pool, loss
     
     def save_images(self):
         output_dir = os.path.join(
