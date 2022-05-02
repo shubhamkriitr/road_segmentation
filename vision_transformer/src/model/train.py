@@ -130,7 +130,6 @@ def train(model,
                 "Top-1 test accuracy: {acc:.1f}".format(acc=best_acc))
     return loggers
     
-    
 
 
 def train_epoch(model, 
@@ -290,4 +289,5 @@ def model_forward(model, inp, n=4, avgpool_patchtokens=False):
             model_output = model_output.reshape(model_output.shape[0], -1)
     else:
         model_output = model(inp)
+
     return model_output

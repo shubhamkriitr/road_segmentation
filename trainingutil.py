@@ -319,10 +319,10 @@ class ExperimentPipeline(BaseExperimentPipeline):
     
     def prepare_metrics(self):
         self.metrics = {}
-        self.metrics["F1"] = F1Score(threshold=self.config["threshold"], average="weighted")
-        self.metrics["Accuracy"] = Accuracy(threshold=self.config["threshold"], average="weighted")
-        self.metrics["Recall"] = Recall(threshold=self.config["threshold"], average="weighted")
-        self.metrics["Precision"] = Precision(threshold=self.config["threshold"], average="weighted")
+        self.metrics["F1"] = F1Score(num_classes=2, threshold=self.config["threshold"], average="weighted")
+        self.metrics["Accuracy"] = Accuracy(num_classes=2, threshold=self.config["threshold"], average="weighted")
+        self.metrics["Recall"] = Recall(num_classes=2, threshold=self.config["threshold"], average="weighted")
+        self.metrics["Precision"] = Precision(num_classes=2, threshold=self.config["threshold"], average="weighted")
         
     def prepare_class_weights_for_cost_function(self):
         # TODO: Add if needed
