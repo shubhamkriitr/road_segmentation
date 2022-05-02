@@ -457,52 +457,44 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                 predictions.append(pred)
                 targets.append(target)
 
-            targets = torch.cat(targets, axis=0)
-            predictions = torch.cat(predictions, axis=0)
-            flattened_preds = predictions.to('cpu').flatten()
-            flattened_targets = targets.int().to('cpu')[:, 0].flatten()
+        targets = torch.cat(targets, axis=0)
+        predictions = torch.cat(predictions, axis=0)
 
-            f1_value = self.metrics["F1"](
-                flattened_preds, flattened_targets)
-            precision_value = self.metrics["Precision"](
-                flattened_preds, flattened_targets)
-            acc_value = self.metrics["Accuracy"](
-                flattened_preds, flattened_targets)
-            recall_value = self.metrics["Recall"](
-                flattened_preds, flattened_targets)
+        if self.config.get("compute_loss_on_patches"):
+            predictions = pooling(predictions).to('cpu').flatten()
+            targets = pooling(targets).round().int().to('cpu')[:, 0].flatten()
+        else:
+            predictions = predictions.to('cpu').flatten()
+            targets = targets.int().to('cpu')[:, 0].flatten()
 
-            pooled_preds = pooling(predictions).to('cpu').flatten()
-            pooled_targets = pooling(targets).round().int().to('cpu')[:, 0].flatten()
-
-            f1_value_pool = self.metrics["F1"](
-                pooled_preds, pooled_targets)
-            precision_value_pool = self.metrics["Precision"](
-                pooled_preds, pooled_targets)
-            acc_value_pool = self.metrics["Accuracy"](
-                pooled_preds, pooled_targets)
-            recall_value_pool = self.metrics["Recall"](
-                pooled_preds, pooled_targets)
+        f1_value = self.metrics["F1"](
+            predictions, targets)
+        precision_value = self.metrics["Precision"](
+            predictions, targets)
+        acc_value = self.metrics["Accuracy"](
+            predictions, targets)
+        recall_value = self.metrics["Recall"](
+            predictions, targets)
 
         self.summary_writer.add_scalar(
             f"{eval_type}/loss", eval_loss / len(_loader.dataset),
             current_epoch)
-        self.summary_writer.add_scalar(f"{eval_type}/F1", f1_value_pool,
+        self.summary_writer.add_scalar(f"{eval_type}/F1", f1_value,
                                        current_epoch)
-        self.summary_writer.add_scalar(f"{eval_type}/Precision", precision_value_pool,
+        self.summary_writer.add_scalar(f"{eval_type}/Precision", precision_value,
                                        current_epoch)
-        self.summary_writer.add_scalar(f"{eval_type}/Recall", recall_value_pool,
+        self.summary_writer.add_scalar(f"{eval_type}/Recall", recall_value,
                                        current_epoch)
-        self.summary_writer.add_scalar(f"{eval_type}/Accuracy", acc_value_pool,
+        self.summary_writer.add_scalar(f"{eval_type}/Accuracy", acc_value,
                                        current_epoch)
         logger.info(f"Evaluation loss after epoch {current_epoch}/{n_epochs}:"
                     f" {eval_loss / len(_loader.dataset)}")
         logger.info(
-            f"""Evaluation metrics after epoch {current_epoch}/{n_epochs}: 
-                NO_POOLING => F1: {f1_value} Acc: {acc_value} | Precision: {precision_value} | Recall: {recall_value}
-                POOLING => F1: {f1_value_pool} Acc: {acc_value_pool} | Precision: {precision_value_pool} | Recall: {recall_value_pool}
-                ------------------------""")
+            f"""Evaluation metrics after epoch {current_epoch}/{n_epochs} {"(on 16x16 patches)" if self.config.get("compute_loss_on_patches") else "(at pixel level)"}: 
+                        => F1: {f1_value} Acc: {acc_value} | Precision: {precision_value} | Recall: {recall_value}
+                        ------------------------""")
 
-        return f1_value_pool, precision_value_pool, recall_value_pool, acc_value_pool, loss
+        return f1_value, precision_value, recall_value, acc_value, loss
     
     def save_images(self):
         output_dir = os.path.join(
