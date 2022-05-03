@@ -16,6 +16,7 @@ from utils import commonutil
 from utils.loggingutil import logger
 from training.cost_functions import CostFunctionFactory
 from submit.mask_to_submission import python_execution as mask_to_submission
+import copy
 
 
 class BaseTrainer(object):
@@ -106,15 +107,14 @@ class BaseExperimentPipeline(object):
     training, logging, evaluation, summarization etc.
     """
 
-    def __init__(self, config) -> None:
+    def __init__(self, config, overwrite_config={}) -> None:
         self.config = None
-        self.initialize_config(config)
+        self.initialize_config(config, overwrite_config)
 
-    def initialize_config(self, config):
+    def initialize_config(self, config, overwrite_config={}):
         config = self.load_config(config)
 
-        # TODO: add/ override some params here
-        self.config = config
+        self.config = config | overwrite_config  # Merge dictionaries
 
     def prepare_experiment(self):
         raise NotImplementedError()
@@ -170,8 +170,8 @@ class OptimizerFactory(BaseFactory):
 
 
 class ExperimentPipeline(BaseExperimentPipeline):
-    def __init__(self, config) -> None:
-        super().__init__(config)
+    def __init__(self, config, overwrite_config={}) -> None:
+        super().__init__(config, overwrite_config)
 
     def prepare_experiment(self):
         self.prepare_model()
@@ -292,7 +292,9 @@ class ExperimentPipeline(BaseExperimentPipeline):
     def prepare_summary_writer(self):
         experiment_tag = self.config["experiment_metadata"]["tag"]
         timestamp = get_timestamp_str()
-        self.current_experiment_directory = os.path.join(
+
+        self.current_experiment_directory = self.config.get("experiment_directory") if self.config.get(
+            "experiment_directory") else os.path.join(
             self.config["logdir"], timestamp + "_" + experiment_tag)
 
         os.makedirs(self.current_experiment_directory, exist_ok=True)
@@ -303,6 +305,8 @@ class ExperimentPipeline(BaseExperimentPipeline):
 
         self.summary_writer = SummaryWriter(
             log_dir=self.current_experiment_log_directory)
+
+        logger.info(self.current_experiment_directory)
 
     def prepare_cost_function(self):
         class_weights = self.prepare_class_weights_for_cost_function()
@@ -319,10 +323,14 @@ class ExperimentPipeline(BaseExperimentPipeline):
 
     def prepare_metrics(self):
         self.metrics = {}
-        self.metrics["F1"] = F1Score(num_classes=2, threshold=self.config["threshold"], average="weighted", multiclass=True)
-        self.metrics["Accuracy"] = Accuracy(num_classes=2, threshold=self.config["threshold"], average="weighted", multiclass=True)
-        self.metrics["Recall"] = Recall(num_classes=2, threshold=self.config["threshold"], average="weighted", multiclass=True)
-        self.metrics["Precision"] = Precision(num_classes=2, threshold=self.config["threshold"], average="weighted", multiclass=True)
+        self.metrics["F1"] = F1Score(num_classes=2, threshold=self.config["threshold"], average="weighted",
+                                     multiclass=True)
+        self.metrics["Accuracy"] = Accuracy(num_classes=2, threshold=self.config["threshold"], average="weighted",
+                                            multiclass=True)
+        self.metrics["Recall"] = Recall(num_classes=2, threshold=self.config["threshold"], average="weighted",
+                                        multiclass=True)
+        self.metrics["Precision"] = Precision(num_classes=2, threshold=self.config["threshold"], average="weighted",
+                                              multiclass=True)
 
     def prepare_class_weights_for_cost_function(self):
         # TODO: Add if needed
@@ -370,11 +378,12 @@ class ExperimentPipeline(BaseExperimentPipeline):
 
     def create_submission(self):
         logger.info("======== Creating submission file ========")
+        best_file_name = [i for i in os.listdir(self.current_experiment_directory) if "best_model" in i][0]
 
         # Load best model
         self.model.load_state_dict(
             torch.load(
-                os.path.join(self.current_experiment_directory, f"best_model_{self.config['model_name_tag']}.ckpt"),
+                os.path.join(self.current_experiment_directory, best_file_name),
                 map_location=commonutil.resolve_device()))
 
         # Save images
@@ -389,6 +398,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
                                 test_output_dir, self.config["threshold"],
                                 save_submission_files=True, offset=144)
 
+        os.makedirs(os.path.join(test_output_dir, "submit/predictions"), exist_ok=False)
         # Create CSV file
         mask_to_submission(base_dir=os.path.join(test_output_dir, "submit/predictions"),
                            submission_filename=os.path.join(self.current_experiment_directory, "to_upload.csv"))
@@ -397,8 +407,10 @@ class ExperimentPipeline(BaseExperimentPipeline):
 
 
 class ExperimentPipelineForSegmentation(ExperimentPipeline):
-    def __init__(self, config) -> None:
-        super().__init__(config)
+    def __init__(self, config, overwrite_config={}, evaluation=False) -> None:
+        security_overwrite = {
+            "experiment_directory": None} if evaluation is False else {}  # Ensure we do not overwrite existing experiment by mistake in training
+        super().__init__(config, overwrite_config | security_overwrite)
         self.best_metric = None
 
     def epoch_callback(self, model: nn.Module, batch_data, global_batch_number,
@@ -416,7 +428,6 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         val_f1, val_prec, val_recall, val_acc, _ = self.compute_and_log_evaluation_metrics(
             model, current_epoch, "val")
 
-        # TODO: metric can also be pulled in config
         metric_to_use_for_model_selection = val_f1
         metric_name = "Validation F1-Score"
 
@@ -474,7 +485,6 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                 # >>> if self.config["device"] == "cuda":
                 # >>>     inp = inp.cuda(non_blocking=True)
                 # >>>     target = target.cuda(non_blocking=True)
-                # TODO: take device info from `resolve_device`
                 inp, target = inp.to(commonutil.resolve_device()), \
                               target.to(commonutil.resolve_device())
 
@@ -553,30 +563,19 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
 
 
 class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
-    def __init__(self, config) -> None:
-        super().__init__(config)
+    def __init__(self, config, overwrite_config={}) -> None:
+        assert config.get("experiment_directory") is not None, "experiment_directory to evaluate must be specified"
+        assert "config.yaml" in os.listdir(
+            config["experiment_directory"]), "experiment_directory must contain config.yaml"
+        super().__init__(os.path.join(config['experiment_directory'], "config.yaml"),
+                         overwrite_config | {"experiment_directory": copy.deepcopy(config["experiment_directory"]),
+                                             "pipeline_class": "EvaluationPipelineForSegmentation"}, evaluation=True)
 
     def run_experiment(self):
-        self.save_config()
+        # Print metrics on validation
         val_f1, val_prec, val_recall, val_acc, _ = self.compute_and_log_evaluation_metrics(
             self.model, 0, "val")
-        test_f1, test_prec, test_recall, test_acc, _ = self.compute_and_log_evaluation_metrics(
-            self.model, 0, "test")
-        self.save_images()
-
-    def save_images(self):
-        output_dir = os.path.join(
-            self.current_experiment_directory, "output_images"
-        )
-        logger.info(f"Saving images at: {output_dir}")
-        val_output_dir, test_output_dir = (os.path.join(output_dir, p)
-                                           for p in ["val", "test"])
-        os.makedirs(output_dir, exist_ok=False)
-        commonutil.write_images(self.model, self.test_loader,
-                                test_output_dir, self.config["threshold"],
-                                save_submission_files=True, offset=144)
-        # commonutil.write_images(self.model, self.val_loader,
-        #                         val_output_dir, self.config["threshold"])
+        self.create_submission()
 
 
 PIPELINE_NAME_TO_CLASS_MAP = {
@@ -600,5 +599,3 @@ if __name__ == "__main__":
     pipeline = pipeline_class(config=config_data)
     pipeline.prepare_experiment()
     pipeline.run_experiment()
-
-

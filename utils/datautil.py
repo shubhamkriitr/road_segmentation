@@ -8,7 +8,7 @@ import logging
 import PIL
 import numpy as np
 import random
-from commonutil import BaseFactory
+from utils.commonutil import BaseFactory
 
 # TODO: better to take this from run config sigleton
 TENSOR_FLOAT_DTYPE = torch.float32
@@ -258,6 +258,25 @@ def get_train_val_test_dataloaders(root_dir: str,
                                                                                      shuffle=shuffle), torch.utils.data.DataLoader(
         test_dataset, batch_size=batch_size, shuffle=False)
 
+class VanillaDataLoaderUtil(object):
+    def __init__(self, config=None) -> None:
+        self.config = config  # currently not in use (adding for extension)#TODO
+
+    def get_data_loaders(self, root_dir: str,
+                         batch_size: int = 10,
+                         shuffle: bool = True,
+                         normalize: bool = True):
+        """
+        Returns tuple of (train_loader, val_loader, test_loader)
+        """
+        train_loader, val_loader, test_loader = get_train_val_test_dataloaders(
+            root_dir=root_dir,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            normalize=normalize
+        )
+
+        return train_loader, val_loader, test_loader
 
 class DeepGlobeLoaderUtil(object):
     def __init__(self, config=None) -> None:
@@ -267,7 +286,7 @@ class DeepGlobeLoaderUtil(object):
                          batch_size: int = 10,
                          shuffle: bool = True,
                          normalize: bool = True):
-        train_loader, val_loader = get_train_test_dataloaders(
+        train_loader, val_loader, test_loader = get_train_val_test_dataloaders(
             root_dir=root_dir,
             batch_size=batch_size,
             shuffle=shuffle,
@@ -282,9 +301,8 @@ class DeepGlobeLoaderUtil(object):
 DATALOADER_UTIL_CLASS_MAP = {
     "VanillaDataLoaderUtil": VanillaDataLoaderUtil,
     "DeepGlobeLoaderUtil": DeepGlobeLoaderUtil,
-    "VanillaTestDataLoaderUtil": VanillaTestDataLoaderUtil
+    "VanillaTestDataLoaderUtil": VanillaDataLoaderUtil
 }
-
 
 class DataLoaderUtilFactory(BaseFactory):
     def __init__(self, config=None) -> None:
