@@ -398,9 +398,8 @@ class ExperimentPipeline(BaseExperimentPipeline):
                                 test_output_dir, self.config["threshold"],
                                 save_submission_files=True, offset=144)
 
-        os.makedirs(os.path.join(test_output_dir, "submit/predictions"), exist_ok=False)
         # Create CSV file
-        mask_to_submission(base_dir=os.path.join(test_output_dir, "submit/predictions"),
+        mask_to_submission(base_dir=os.path.join(output_dir, "submit/predictions"),
                            submission_filename=os.path.join(self.current_experiment_directory, "to_upload.csv"))
         logger.info(
             "========> Submision file exported to {}".format(os.path.join(test_output_dir, "submit/to_upload.csv")))
