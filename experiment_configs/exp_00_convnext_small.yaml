@@ -7,6 +7,7 @@ device: "cuda" # TODO: take device info from `resolve_device`
 dataloader_util_class_name: "VanillaDataLoaderUtil" # This utility class
 # is supposed to return loaders upon invoking its `get_data_loaders`
 dataloader_root_dir: "/home/jovyan/work/cil/data/training/split" # set root dir to load data from
+data_root_dir: "/home/jovyan/work/cil/data/training/split"
 shuffle: true
 normalize: false
 val_split: 0.2 # TODO: currently NOT being used - It is assumed that dataloader
