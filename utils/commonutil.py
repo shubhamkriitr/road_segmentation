@@ -103,4 +103,11 @@ class BaseFactory(object):
             return self.resource_map[resource_name]
         except KeyError:
             raise KeyError(f"{resource_name} is not allowed. Please use one of"
-                           f" these names: {list(self.resource_map.keys())}") 
+                           f" these names: {list(self.resource_map.keys())}")
+
+def read_config(config_path):
+    config_data = None
+    with open(config, 'r', encoding="utf-8") as f:
+        config_data = yaml.load(f, Loader=yaml.FullLoader)
+    assert config_data is not None, "Config file not found"
+    return config_data

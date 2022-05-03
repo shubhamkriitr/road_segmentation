@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from utils.datautil import (DataLoaderUtilFactory)
 from models.model_factory import ModelFactory
-from utils.commonutil import get_timestamp_str, BaseFactory
+from utils.commonutil import get_timestamp_str, BaseFactory, read_config
 from utils import commonutil
 from utils.loggingutil import logger
 from training.cost_functions import CostFunctionFactory
@@ -101,6 +101,17 @@ class NetworkTrainer(BaseTrainer):
                               [self.model, batch_data, global_batch_number,
                                current_epoch, current_epoch_batch_number], {"loss": loss})
 
+class EnsembleTrainer(NetworkTrainer):
+    def train():
+        for conf_path in self.master_config["ensemble"]:
+            conf_data = read_config(conf_path)
+            try:
+                override_dict = self.master_config["override"]
+                for key in override_dict.keys():
+                    conf_data[key] = override_dict[key]
+            except KeyError: # no override config
+                pass
+            run_experiment(conf_data)
 
 class BaseExperimentPipeline(object):
     """Class to link experiment stages like
@@ -204,8 +215,11 @@ class ExperimentPipeline(BaseExperimentPipeline):
         return train_loader, val_loader, test_loader
 
     def prepare_trainer(self):
-        trainer_class = TrainerFactory().get_uninitialized(
-            self.config["trainer_class_name"])
+        if "ensemble" in self.config:
+            trainer = EnsembleTrainer
+        else:
+            trainer_class = TrainerFactory().get_uninitialized(
+                self.config["trainer_class_name"])
 
         trainer = trainer_class(model=self.model,
                                 dataloader=self.train_loader,
@@ -218,13 +232,15 @@ class ExperimentPipeline(BaseExperimentPipeline):
                                 }
                                 )
 
+        if "ensemble" in self.config: trainer.master_config = self.config
         self.trainer = trainer
         return trainer
 
     def prepare_model(self):
-        # TODO: use model config too (or make it work by creating new class)
-        model = ModelFactory().get(self.config["model_class_name"])
-        self.model = model
+        if "ensemble" not in self.config:
+            # TODO: use model config too (or make it work by creating new class)
+            model = ModelFactory().get(self.config["model_class_name"])
+            self.model = model
 
         # use cuda if available (TODO: decide to use config/resolve device)
         self.model.to(commonutil.resolve_device())
@@ -594,6 +610,14 @@ if __name__ == "__main__":
     with open(args.config, 'r', encoding="utf-8") as f:
         config_data = yaml.load(f, Loader=yaml.FullLoader)
 
+    pipeline_class = PIPELINE_NAME_TO_CLASS_MAP[config_data["pipeline_class"]]
+    pipeline = pipeline_class(config=config_data)
+    pipeline.prepare_experiment()
+    pipeline.run_experiment()
+
+# was originally part of run_experiment module but it is used from EnsembleTrainer, which means trainingutil would
+# have to import run_experiment, which would create a cyclic dependency
+def run_experiment(config_data):
     pipeline_class = PIPELINE_NAME_TO_CLASS_MAP[config_data["pipeline_class"]]
     pipeline = pipeline_class(config=config_data)
     pipeline.prepare_experiment()
