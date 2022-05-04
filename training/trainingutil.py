@@ -18,6 +18,11 @@ from training.cost_functions import CostFunctionFactory
 from submit.mask_to_submission import python_execution as mask_to_submission
 import copy
 
+def merge_dicts(initial, override):
+    ret = {}
+    for key in initial.keys(): ret[key] = initial[key]
+    for key in override.keys(): ret[key] = override[key]
+    return ret
 
 class BaseTrainer(object):
 
@@ -114,7 +119,7 @@ class BaseExperimentPipeline(object):
     def initialize_config(self, config, overwrite_config={}):
         config = self.load_config(config)
 
-        self.config = config | overwrite_config  # Merge dictionaries
+        self.config = merge_dicts(config, overwrite_config)
 
     def prepare_experiment(self):
         raise NotImplementedError()
@@ -409,7 +414,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
     def __init__(self, config, overwrite_config={}, evaluation=False) -> None:
         security_overwrite = {
             "experiment_directory": None} if evaluation is False else {}  # Ensure we do not overwrite existing experiment by mistake in training
-        super().__init__(config, overwrite_config | security_overwrite)
+        super().__init__(config, merge_dicts(overwrite_config, security_overwrite))
         self.best_metric = None
 
     def epoch_callback(self, model: nn.Module, batch_data, global_batch_number,
@@ -567,8 +572,8 @@ class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
         assert "config.yaml" in os.listdir(
             config["experiment_directory"]), "experiment_directory must contain config.yaml"
         super().__init__(os.path.join(config['experiment_directory'], "config.yaml"),
-                         overwrite_config | {"experiment_directory": copy.deepcopy(config["experiment_directory"]),
-                                             "pipeline_class": "EvaluationPipelineForSegmentation"}, evaluation=True)
+                         merge_dicts(overwrite_config, {"experiment_directory": copy.deepcopy(config["experiment_directory"]),
+                                             "pipeline_class": "EvaluationPipelineForSegmentation"}), evaluation=True)
 
     def run_experiment(self):
         # Print metrics on validation
