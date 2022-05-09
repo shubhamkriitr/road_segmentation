@@ -173,6 +173,16 @@ class SoftBootstrappedDiceLoss(Loss):
                / (1 + torch.sum(input * input + target * target))
         return cost
 
+class TverskyLoss(Loss):
+    def __init__(self, beta=0.9, size_average=None, reduce=None, reduction: str = 'mean') -> None:
+        super().__init__(size_average, reduce, reduction)
+        self.beta = beta
+        self.eps = 1e-9
+
+    def forward(self, input, target):
+        nr = target*input
+        dr = nr + self.beta*(1-target)*input + (1-self.beta)*target*(1-input)
+        return 1. - (1 + nr)/(1 + dr + self.eps)
 
 class EdgeWeightedSoftBootstrappedDiceLoss(Loss):
     def __init__(self, beta=0.9, edge_weight_factor=10, size_average=None,
@@ -204,7 +214,8 @@ COST_FUNCTION_NAME_TO_CLASS_MAP = {
     "SoftBootstrappedDiceLoss": SoftBootstrappedDiceLoss,
     "EdgeWeightedSoftBootstrappedDiceLoss": \
         EdgeWeightedSoftBootstrappedDiceLoss,
-    "PatchedBinaryGeneralizeDiceLoss": PatchedBinaryGeneralizeDiceLoss
+    "PatchedBinaryGeneralizeDiceLoss": PatchedBinaryGeneralizeDiceLoss,
+    "TverskyLoss": TverskyLoss
 }
 
 
