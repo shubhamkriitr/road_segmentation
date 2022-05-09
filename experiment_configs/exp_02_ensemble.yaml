@@ -1,0 +1,43 @@
+pipeline_class: "ExperimentPipelineForSegmentation" # choose the pipeline
+experiment_metadata:
+  description: "Training this model for submission. This is convnext small model with \
+    pretrained weights (none of its weights are frozen)"
+  tag: "exp_00_convnext_small"
+device: "cuda" # TODO: take device info from `resolve_device`
+dataloader_util_class_name: "VanillaDataLoaderUtil" # This utility class
+# is supposed to return loaders upon invoking its `get_data_loaders`
+data_root_dir: "data/" # set root dir to load data from
+shuffle: true
+normalize: false
+val_split: 0.2 # TODO: currently NOT being used - It is assumed that dataloader
+# util will give already split data loaders
+model_class_name: "PrunedConvnextSmall" # The network to use e.g. UNet
+load_from_checkpoint: false
+checkpoint_path: ""
+cost_function_class_name: "BinaryGeneralizeDiceLoss"
+threshold: 0.5
+trainer_class_name: "NetworkTrainer"
+num_epochs: 100
+batch_size: 10
+optimizer_class_name: "AdamW"
+learning_rate: 0.001
+scheduler: "ReduceLROnPlateau"
+weight_decay: 0.01
+logdir: "runs"
+batch_log_frequency: 1 # Print log after after these many batches
+tensorboard_log_frequency: 1 # Log scalars after these many batches
+model_save_frequency: 2 # frequency in epochs
+model_name_tag: "convnext_small" # it will be included in the model file name
+save_images: false
+test_batch_size: 100 # TODO: currently NOT being used
+do_class_weighting: null
+class_weighting_scheme: null
+compute_loss_on_patches: false
+create_submission: true
+ensemble:
+  - "experiment_configs/exp_00_convnext_small.yaml"
+  - "experiment_configs/exp_01_efficientnet.yaml"
+override:
+    model_save_frequency: 200
+    num_epochs: 100
+    create_submission: false # we don't want to create submissions for individual models

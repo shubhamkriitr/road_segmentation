@@ -6,6 +6,7 @@ import imageio
 import numpy as np
 # Generic utility code
 from utils.loggingutil import logger
+import yaml
 
 PROJECTPATH = Path(__file__).parent.parent
 
@@ -107,7 +108,7 @@ class BaseFactory(object):
 
 def read_config(config_path):
     config_data = None
-    with open(config, 'r', encoding="utf-8") as f:
+    with open(config_path, 'r', encoding="utf-8") as f:
         config_data = yaml.load(f, Loader=yaml.FullLoader)
     assert config_data is not None, "Config file not found"
     return config_data

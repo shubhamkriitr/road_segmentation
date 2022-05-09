@@ -106,17 +106,6 @@ class NetworkTrainer(BaseTrainer):
                               [self.model, batch_data, global_batch_number,
                                current_epoch, current_epoch_batch_number], {"loss": loss})
 
-class EnsembleTrainer(NetworkTrainer):
-    def train():
-        for conf_path in self.master_config["ensemble"]:
-            conf_data = read_config(conf_path)
-            try:
-                override_dict = self.master_config["override"]
-                for key in override_dict.keys():
-                    conf_data[key] = override_dict[key]
-            except KeyError: # no override config
-                pass
-            run_experiment(conf_data)
 
 class BaseExperimentPipeline(object):
     """Class to link experiment stages like
@@ -220,11 +209,8 @@ class ExperimentPipeline(BaseExperimentPipeline):
         return train_loader, val_loader, test_loader
 
     def prepare_trainer(self):
-        if "ensemble" in self.config:
-            trainer = EnsembleTrainer
-        else:
-            trainer_class = TrainerFactory().get_uninitialized(
-                self.config["trainer_class_name"])
+        trainer_class = TrainerFactory().get_uninitialized(
+            self.config["trainer_class_name"])
 
         trainer = trainer_class(model=self.model,
                                 dataloader=self.train_loader,
@@ -237,15 +223,13 @@ class ExperimentPipeline(BaseExperimentPipeline):
                                 }
                                 )
 
-        if "ensemble" in self.config: trainer.master_config = self.config
         self.trainer = trainer
         return trainer
 
     def prepare_model(self):
-        if "ensemble" not in self.config:
-            # TODO: use model config too (or make it work by creating new class)
-            model = ModelFactory().get(self.config["model_class_name"])
-            self.model = model
+        # TODO: use model config too (or make it work by creating new class)
+        model = ModelFactory().get(self.config["model_class_name"])
+        self.model = model
 
         # use cuda if available (TODO: decide to use config/resolve device)
         self.model.to(commonutil.resolve_device())
@@ -397,15 +381,19 @@ class ExperimentPipeline(BaseExperimentPipeline):
         except Exception as exc:
             logger.exception(exc)
 
-    def create_submission(self):
+    def create_submission(self, model=None):
         logger.info("======== Creating submission file ========")
-        best_file_name = [i for i in os.listdir(self.current_experiment_directory) if "best_model" in i][0]
 
-        # Load best model
-        self.model.load_state_dict(
-            torch.load(
-                os.path.join(self.current_experiment_directory, best_file_name),
-                map_location=commonutil.resolve_device()))
+        if model is None:
+            best_file_name = [i for i in os.listdir(self.current_experiment_directory) if "best_model" in i][0]
+    
+            # Load best model
+            self.model.load_state_dict(
+                torch.load(
+                    os.path.join(self.current_experiment_directory, best_file_name),
+                    map_location=commonutil.resolve_device()))
+        else:
+            self.model = model
 
         # Save images
         output_dir = os.path.join(
@@ -604,6 +592,65 @@ PIPELINE_NAME_TO_CLASS_MAP = {
     "EvaluationPipelineForSegmentation": EvaluationPipelineForSegmentation
 }
 
+
+class Ensemble(torch.nn.Module):
+    def __init__(self, models=[]):
+        super().__init__()
+        self.models = torch.nn.ModuleList(models)
+    def add_model(self, model):
+        self.models.append(model)
+    def forward(self, x):
+        y = None
+        with torch.no_grad():
+            for model in self.models:
+                if y is None:
+                    y = model(x)
+                else:
+                    y += model(x)
+        y /= len(self.models)
+        return y
+
+
+class EnsemblePipeline(ExperimentPipelineForSegmentation):
+    def __init__(self, config):
+        super().__init__(config)
+        self.master_config = config
+
+    def prepare_experiment(self):
+        self.prepare_summary_writer()
+        self.prepare_dataloaders()
+        self.prepare_cost_function()
+        self.prepare_metrics()
+        self.prepare_dataloaders()
+    
+    def run_experiment(self):
+        models = []
+        for conf_path in self.master_config["ensemble"]:
+            conf_data = read_config(conf_path)
+            try:
+                override_dict = self.master_config["override"]
+                for key in override_dict.keys():
+                    conf_data[key] = override_dict[key]
+            except KeyError: # no override config
+                pass
+            models.append(run_experiment(conf_data, return_model=True))
+        ensemble = Ensemble(models)
+        self.compute_and_log_evaluation_metrics(ensemble, 0, "val")
+        if self.master_config["create_submission"]: self.create_submission(model=ensemble)
+
+
+# was originally part of run_experiment module but it is used for ensembling, which means trainingutil would
+# have to import run_experiment, which would create a cyclic dependency
+def run_experiment(config_data, return_model=False):
+    if "ensemble" in config_data:
+        pipeline_class = EnsemblePipeline
+    else:
+        pipeline_class = PIPELINE_NAME_TO_CLASS_MAP[config_data["pipeline_class"]]
+    pipeline = pipeline_class(config=config_data)
+    pipeline.prepare_experiment()
+    pipeline.run_experiment()
+    if return_model: return pipeline.trainer.model
+
 if __name__ == "__main__":
     DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_02_resnet50_split.yaml"
     argparser = ArgumentParser()
@@ -615,14 +662,6 @@ if __name__ == "__main__":
     with open(args.config, 'r', encoding="utf-8") as f:
         config_data = yaml.load(f, Loader=yaml.FullLoader)
 
-    pipeline_class = PIPELINE_NAME_TO_CLASS_MAP[config_data["pipeline_class"]]
-    pipeline = pipeline_class(config=config_data)
-    pipeline.prepare_experiment()
-    pipeline.run_experiment()
-
-# was originally part of run_experiment module but it is used from EnsembleTrainer, which means trainingutil would
-# have to import run_experiment, which would create a cyclic dependency
-def run_experiment(config_data):
     pipeline_class = PIPELINE_NAME_TO_CLASS_MAP[config_data["pipeline_class"]]
     pipeline = pipeline_class(config=config_data)
     pipeline.prepare_experiment()
