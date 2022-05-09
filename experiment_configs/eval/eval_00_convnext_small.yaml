@@ -1,0 +1,2 @@
+pipeline_class: "EvaluationPipelineForSegmentation"
+experiment_directory: "/home/jovyan/work/cil/runs/2022-05-03_073559__exp_00_convnext_small"
