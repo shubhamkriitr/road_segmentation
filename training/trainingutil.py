@@ -626,7 +626,7 @@ class EnsemblePipeline(ExperimentPipelineForSegmentation):
     def run_experiment(self):
         models = []
         for conf_path in self.master_config["ensemble"]:
-            conf_data = read_config(conf_path)
+            conf_data = merge_dicts(self.master_config, read_config(conf_path))
             try:
                 override_dict = self.master_config["override"]
                 for key in override_dict.keys():
