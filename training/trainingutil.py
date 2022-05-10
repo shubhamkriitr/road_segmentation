@@ -17,6 +17,7 @@ from utils.loggingutil import logger
 from training.cost_functions import CostFunctionFactory
 from submit.mask_to_submission import python_execution as mask_to_submission
 import copy
+import numpy as np
 
 def merge_dicts(initial, override):
     ret = {}
@@ -573,23 +574,57 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         commonutil.write_images(self.model, self.val_loader,
                                 val_output_dir, self.config["threshold"])
         
-    def save_probability_map(self, probaility_map, epoch, type, is_best):
+    def save_probability_map(self, model, probaility_map, current_epoch, type_, is_best):
         """ 
         `probability_map`: numpy array of probability maps of size (N, H, W),
             if it is passed as `None`, then using the current model state,
             predictions will be computed again.
         
-        `epcoh`: current epoch (to be used in the filename)
+        `current_epoch`: current epoch (to be used in the filename)
         
-        `type` is either `val` or `test`
+        `type_` is either `val` or `test`
         
         `is_best`: flag to indicate if it is the predictions by the best model
             so far
         
         """
+        logger.debug(f"preparing to save probability map for type : `{type_}`")
+        if model is None:
+            logger.debug("Using current model state. (self.model)")
+            model = self.model
         
-        pass
+        _loader = None
+        if probaility_map is None:
+            if type_ == "val":
+                _loader = self.val_loader
+            elif type_ == "test":
+                _loader = self.test_loader
+            else:
+                raise ValueError(f"Unsupported type : {type_}")
 
+            logger.debug(f"Will compute predictions for inputs from "
+                         f"dataloader: {_loader}")
+            
+            probaility_map, _, _ = self.evaluate_model(model, _loader)
+            
+        if isinstance(probaility_map, torch.Tensor):
+            probaility_map = probaility_map.cpu().numpy()
+    
+        tag = "pred-probability-maps"
+        
+        if is_best:
+            output_file_name \
+                = f"best-{type_}-{tag}"
+        else:
+            output_file_name \
+                = f"{type_}-epoch-{str(current_epoch).zfill(4)}-{tag}"
+        
+        out_path = os.path.join(self.current_experiment_directory,
+                                output_file_name)
+        
+        logger.info(f"Saving to file path: {out_path}")
+        
+        np.save(out_path, probaility_map)
 
 class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
     def __init__(self, config, overwrite_config={}) -> None:
