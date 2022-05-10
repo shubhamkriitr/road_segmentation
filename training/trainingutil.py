@@ -448,6 +448,8 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             file_path = os.path.join(self.current_experiment_directory,
                                      f"best_model_{self.config['model_name_tag']}.ckpt")
             torch.save(model.state_dict(), file_path)
+            self.save_probability_map(model=None, probability_map=None,
+                current_epoch=current_epoch, type_="test", is_best=True)
 
         if (current_epoch % self.config["model_save_frequency"] == 0) \
                 or (current_epoch == self.config["num_epochs"]):
@@ -455,6 +457,8 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                                      f"model_{self.config['model_name_tag']}_" \
                                      + f"{str(current_epoch).zfill(4)}.ckpt")
             torch.save(model.state_dict(), file_path)
+            self.save_probability_map(model=None, probability_map=None,
+                current_epoch=current_epoch, type_="test", is_best=False)
 
         if hasattr(self, "scheduler"):
             self.scheduler.step(metric_to_use_for_model_selection)
@@ -574,7 +578,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         commonutil.write_images(self.model, self.val_loader,
                                 val_output_dir, self.config["threshold"])
         
-    def save_probability_map(self, model, probaility_map, current_epoch, type_, is_best):
+    def save_probability_map(self, model, probability_map, current_epoch, type_, is_best):
         """ 
         `probability_map`: numpy array of probability maps of size (N, H, W),
             if it is passed as `None`, then using the current model state,
@@ -594,7 +598,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             model = self.model
         
         _loader = None
-        if probaility_map is None:
+        if probability_map is None:
             if type_ == "val":
                 _loader = self.val_loader
             elif type_ == "test":
@@ -605,10 +609,12 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             logger.debug(f"Will compute predictions for inputs from "
                          f"dataloader: {_loader}")
             
-            probaility_map, _, _ = self.evaluate_model(model, _loader)
+            probability_map, _, _ = self.evaluate_model(model, _loader)
+            probability_map = torch.concat(probability_map, dim=0)
             
-        if isinstance(probaility_map, torch.Tensor):
-            probaility_map = probaility_map.cpu().numpy()
+            
+        if isinstance(probability_map, torch.Tensor):
+            probability_map = probability_map.cpu().numpy()
     
         tag = "pred-probability-maps"
         
@@ -624,7 +630,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         
         logger.info(f"Saving to file path: {out_path}")
         
-        np.save(out_path, probaility_map)
+        np.save(out_path, probability_map)
 
 class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
     def __init__(self, config, overwrite_config={}) -> None:
