@@ -475,7 +475,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                                            eval_type):
         pooling = torch.nn.AvgPool2d(kernel_size=16, stride=16)  # 16 is evaluation patch size
         model.eval()
-        eval_loss = 0.
+        eval_loss = 0. # It is cumulative eval loss
         n_epochs = self.config["num_epochs"]
         _loader = None
         if eval_type == "val":
@@ -502,6 +502,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                 eval_loss += loss.item()
                 predictions.append(pred)
                 targets.append(target)
+        avg_eval_loss = eval_loss / len(_loader.dataset)
 
         targets = torch.cat(targets, axis=0)
         predictions = torch.cat(predictions, axis=0)
@@ -531,8 +532,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             predictions_patches, targets_patches)
 
         self.summary_writer.add_scalar(
-            f"{eval_type}/loss", eval_loss / len(_loader.dataset),
-            current_epoch)
+            f"{eval_type}/loss", avg_eval_loss, current_epoch)
         self.summary_writer.add_scalar(f"{eval_type}/F1", f1_value,
                                        current_epoch)
         self.summary_writer.add_scalar(f"{eval_type}/Precision", precision_value,
@@ -550,7 +550,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         self.summary_writer.add_scalar(f"{eval_type}/Accuracy_patches", acc_value_patches,
                                        current_epoch)
         logger.info(f"Evaluation loss after epoch {current_epoch}/{n_epochs}:"
-                    f" {eval_loss / len(_loader.dataset)}")
+                    f" {avg_eval_loss}")
         logger.info(
             f"""Evaluation metrics after epoch {current_epoch}/{n_epochs}:\nPixel-level => F1: {f1_value} Acc: {acc_value} | Precision: {precision_value} | Recall: {recall_value}\nPatch-level => F1: {f1_value_patches} Acc: {acc_value_patches} | Precision: {precision_value_patches} | Recall: {recall_value_patches}\n------------------------""")
 
