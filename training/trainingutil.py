@@ -475,7 +475,6 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                                            eval_type):
         pooling = torch.nn.AvgPool2d(kernel_size=16, stride=16)  # 16 is evaluation patch size
         model.eval()
-        eval_loss = 0. # It is cumulative eval loss
         n_epochs = self.config["num_epochs"]
         _loader = None
         if eval_type == "val":
@@ -484,25 +483,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             _loader = self.test_loader
         else:
             raise AssertionError(f"Unsupported eval type: {eval_type}")
-        with torch.no_grad():
-            predictions = []
-            targets = []
-
-            for i, (inp, target) in enumerate(_loader):
-                # move input to cuda if required
-                # >>> if self.config["device"] == "cuda":
-                # >>>     inp = inp.cuda(non_blocking=True)
-                # >>>     target = target.cuda(non_blocking=True)
-                inp, target = inp.to(commonutil.resolve_device()), \
-                              target.to(commonutil.resolve_device())
-
-                # forward pass
-                pred = model.forward(inp)
-                loss = self.cost_function(pred, target)
-                eval_loss += loss.item()
-                predictions.append(pred)
-                targets.append(target)
-        avg_eval_loss = eval_loss / len(_loader.dataset)
+        predictions, targets, avg_eval_loss = self.evaluate_model(model, _loader)
 
         targets = torch.cat(targets, axis=0)
         predictions = torch.cat(predictions, axis=0)
@@ -554,7 +535,30 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         logger.info(
             f"""Evaluation metrics after epoch {current_epoch}/{n_epochs}:\nPixel-level => F1: {f1_value} Acc: {acc_value} | Precision: {precision_value} | Recall: {recall_value}\nPatch-level => F1: {f1_value_patches} Acc: {acc_value_patches} | Precision: {precision_value_patches} | Recall: {recall_value_patches}\n------------------------""")
 
-        return f1_value, precision_value, recall_value, acc_value, loss
+        return f1_value, precision_value, recall_value, acc_value, avg_eval_loss
+
+    def evaluate_model(self, model, _loader):
+        eval_loss = 0. # It is cumulative eval loss
+        with torch.no_grad():
+            predictions = []
+            targets = []
+
+            for i, (inp, target) in enumerate(_loader):
+                # move input to cuda if required
+                # >>> if self.config["device"] == "cuda":
+                # >>>     inp = inp.cuda(non_blocking=True)
+                # >>>     target = target.cuda(non_blocking=True)
+                inp, target = inp.to(commonutil.resolve_device()), \
+                              target.to(commonutil.resolve_device())
+
+                # forward pass
+                pred = model.forward(inp)
+                loss = self.cost_function(pred, target)
+                eval_loss += loss.item()
+                predictions.append(pred)
+                targets.append(target)
+        avg_eval_loss = eval_loss / len(_loader.dataset)
+        return predictions, targets, avg_eval_loss
 
     def save_images(self):
         output_dir = os.path.join(
