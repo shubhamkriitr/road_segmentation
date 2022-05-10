@@ -568,6 +568,23 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                                 train_output_dir, self.config["threshold"])
         commonutil.write_images(self.model, self.val_loader,
                                 val_output_dir, self.config["threshold"])
+        
+    def save_probability_map(self, probaility_map, epoch, type, is_best):
+        """ 
+        `probability_map`: numpy array of probability maps of size (N, H, W),
+            if it is passed as `None`, then using the current model state,
+            predictions will be computed again.
+        
+        `epcoh`: current epoch (to be used in the filename)
+        
+        `type` is either `val` or `test`
+        
+        `is_best`: flag to indicate if it is the predictions by the best model
+            so far
+        
+        """
+        
+        pass
 
 
 class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
