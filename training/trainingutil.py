@@ -17,6 +17,7 @@ from utils.loggingutil import logger
 from training.cost_functions import CostFunctionFactory
 from submit.mask_to_submission import python_execution as mask_to_submission
 import copy
+import numpy as np
 
 def merge_dicts(initial, override):
     ret = {}
@@ -460,6 +461,8 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             file_path = os.path.join(self.current_experiment_directory,
                                      f"best_model_{self.config['model_name_tag']}.ckpt")
             torch.save(model.state_dict(), file_path)
+            self.save_probability_map(model=None, probability_map=None,
+                current_epoch=current_epoch, type_="test", is_best=True)
 
         if (current_epoch % self.config["model_save_frequency"] == 0) \
                 or (current_epoch == self.config["num_epochs"]):
@@ -467,6 +470,8 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                                      f"model_{self.config['model_name_tag']}_" \
                                      + f"{str(current_epoch).zfill(4)}.ckpt")
             torch.save(model.state_dict(), file_path)
+            self.save_probability_map(model=None, probability_map=None,
+                current_epoch=current_epoch, type_="test", is_best=False)
 
         if hasattr(self, "scheduler"):
             self.scheduler.step(metric_to_use_for_model_selection)
@@ -488,7 +493,6 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                                            eval_type):
         pooling = torch.nn.AvgPool2d(kernel_size=16, stride=16)  # 16 is evaluation patch size
         model.eval()
-        eval_loss = 0.
         n_epochs = self.config["num_epochs"]
         _loader = None
         if eval_type == "val":
@@ -497,24 +501,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             _loader = self.test_loader
         else:
             raise AssertionError(f"Unsupported eval type: {eval_type}")
-        with torch.no_grad():
-            predictions = []
-            targets = []
-
-            for i, (inp, target) in enumerate(_loader):
-                # move input to cuda if required
-                # >>> if self.config["device"] == "cuda":
-                # >>>     inp = inp.cuda(non_blocking=True)
-                # >>>     target = target.cuda(non_blocking=True)
-                inp, target = inp.to(commonutil.resolve_device()), \
-                              target.to(commonutil.resolve_device())
-
-                # forward pass
-                pred = model.forward(inp)
-                loss = self.cost_function(pred, target)
-                eval_loss += loss.item()
-                predictions.append(pred)
-                targets.append(target)
+        predictions, targets, avg_eval_loss = self.evaluate_model(model, _loader)
 
         targets = torch.cat(targets, axis=0)
         predictions = torch.cat(predictions, axis=0)
@@ -544,8 +531,7 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
             predictions_patches, targets_patches)
 
         self.summary_writer.add_scalar(
-            f"{eval_type}/loss", eval_loss / len(_loader.dataset),
-            current_epoch)
+            f"{eval_type}/loss", avg_eval_loss, current_epoch)
         self.summary_writer.add_scalar(f"{eval_type}/F1", f1_value,
                                        current_epoch)
         self.summary_writer.add_scalar(f"{eval_type}/Precision", precision_value,
@@ -563,11 +549,34 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
         self.summary_writer.add_scalar(f"{eval_type}/Accuracy_patches", acc_value_patches,
                                        current_epoch)
         logger.info(f"Evaluation loss after epoch {current_epoch}/{n_epochs}:"
-                    f" {eval_loss / len(_loader.dataset)}")
+                    f" {avg_eval_loss}")
         logger.info(
             f"""Evaluation metrics after epoch {current_epoch}/{n_epochs}:\nPixel-level => F1: {f1_value} Acc: {acc_value} | Precision: {precision_value} | Recall: {recall_value}\nPatch-level => F1: {f1_value_patches} Acc: {acc_value_patches} | Precision: {precision_value_patches} | Recall: {recall_value_patches}\n------------------------""")
 
-        return f1_value, precision_value, recall_value, acc_value, loss
+        return f1_value, precision_value, recall_value, acc_value, avg_eval_loss
+
+    def evaluate_model(self, model, _loader):
+        eval_loss = 0. # It is cumulative eval loss
+        with torch.no_grad():
+            predictions = []
+            targets = []
+
+            for i, (inp, target) in enumerate(_loader):
+                # move input to cuda if required
+                # >>> if self.config["device"] == "cuda":
+                # >>>     inp = inp.cuda(non_blocking=True)
+                # >>>     target = target.cuda(non_blocking=True)
+                inp, target = inp.to(commonutil.resolve_device()), \
+                              target.to(commonutil.resolve_device())
+
+                # forward pass
+                pred = model.forward(inp)
+                loss = self.cost_function(pred, target)
+                eval_loss += loss.item()
+                predictions.append(pred)
+                targets.append(target)
+        avg_eval_loss = eval_loss / len(_loader.dataset)
+        return predictions, targets, avg_eval_loss
 
     def save_images(self):
         output_dir = os.path.join(
@@ -581,7 +590,60 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                                 train_output_dir, self.config["threshold"])
         commonutil.write_images(self.model, self.val_loader,
                                 val_output_dir, self.config["threshold"])
+        
+    def save_probability_map(self, model, probability_map, current_epoch, type_, is_best):
+        """ 
+        `probability_map`: numpy array of probability maps of size (N, H, W),
+            if it is passed as `None`, then using the current model state,
+            predictions will be computed again.
+        
+        `current_epoch`: current epoch (to be used in the filename)
+        
+        `type_` is either `val` or `test`
+        
+        `is_best`: flag to indicate if it is the predictions by the best model
+            so far
+        
+        """
+        logger.debug(f"preparing to save probability map for type : `{type_}`")
+        if model is None:
+            logger.debug("Using current model state. (self.model)")
+            model = self.model
+        
+        _loader = None
+        if probability_map is None:
+            if type_ == "val":
+                _loader = self.val_loader
+            elif type_ == "test":
+                _loader = self.test_loader
+            else:
+                raise ValueError(f"Unsupported type : {type_}")
 
+            logger.debug(f"Will compute predictions for inputs from "
+                         f"dataloader: {_loader}")
+            
+            probability_map, _, _ = self.evaluate_model(model, _loader)
+            probability_map = torch.concat(probability_map, dim=0)
+            
+            
+        if isinstance(probability_map, torch.Tensor):
+            probability_map = probability_map.cpu().numpy()
+    
+        tag = "pred-probability-maps"
+        
+        if is_best:
+            output_file_name \
+                = f"best-{type_}-{tag}"
+        else:
+            output_file_name \
+                = f"{type_}-epoch-{str(current_epoch).zfill(4)}-{tag}"
+        
+        out_path = os.path.join(self.current_experiment_directory,
+                                output_file_name)
+        
+        logger.info(f"Saving to file path: {out_path}")
+        
+        np.save(out_path, probability_map)
 
 class EvaluationPipelineForSegmentation(ExperimentPipelineForSegmentation):
     def __init__(self, config, overwrite_config={}) -> None:
@@ -665,7 +727,7 @@ def run_experiment(config_data, return_model=False, ignore_ensemble=False):
     if return_model: return pipeline.trainer.model
 
 if __name__ == "__main__":
-    DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_02_resnet50_split.yaml"
+    DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_03_resnet50_split.yaml"
     argparser = ArgumentParser()
     argparser.add_argument("--config", type=str,
                            default=DEFAULT_CONFIG_LOCATION)
