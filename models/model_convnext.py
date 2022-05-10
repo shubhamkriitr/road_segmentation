@@ -91,21 +91,37 @@ class PrunedConvnext(ConvNeXt):
                                      self.final_activation_layer)
 
         self.remove_unnecessary_layers()
+        self.freeze_encoder = False
 
     def remove_unnecessary_layers(self):
         del self.classifier
 
+    def handle_event(self, event):
+        if event == "freeze_encoder":
+            self.freeze_encoder = True
+        elif event == "unfreeze_encoder":
+            self.freeze_encoder = False
+
     def forward(self, x: Tensor) -> Tensor:
-        # >>> return super()._forward_impl(x)
-        #  N.B. : Make sure to check this implementation in parent class
-        x_0 = self.features[0](x)  # -> torch.Size([1, 96, 100, 100])
-        x_1 = self.features[1](x_0)  # -> torch.Size([1, 96, 100, 100])
-        x_2 = self.features[2](x_1)  # -> torch.Size([1, 192, 50, 50])
-        x_3 = self.features[3](x_2)  # -> torch.Size([1, 192, 50, 50])
-        x_4 = self.features[4](x_3)  # -> torch.Size([1, 384, 25, 25])
-        x_5 = self.features[5](x_4)  # -> torch.Size([1, 384, 25, 25])
-        x_6 = self.features[6](x_5)  # -> torch.Size([1, 768, 12, 12])
-        x_7 = self.features[7](x_6)  # -> torch.Size([1, 768, 12, 12])
+        if self.freeze_encoder: # TODO: think of a way that doesn't need so much code copy-pasting
+            with torch.no_grad():
+                x_0 = self.features[0](x)  # -> torch.Size([1, 96, 100, 100])
+                x_1 = self.features[1](x_0)  # -> torch.Size([1, 96, 100, 100])
+                x_2 = self.features[2](x_1)  # -> torch.Size([1, 192, 50, 50])
+                x_3 = self.features[3](x_2)  # -> torch.Size([1, 192, 50, 50])
+                x_4 = self.features[4](x_3)  # -> torch.Size([1, 384, 25, 25])
+                x_5 = self.features[5](x_4)  # -> torch.Size([1, 384, 25, 25])
+                x_6 = self.features[6](x_5)  # -> torch.Size([1, 768, 12, 12])
+                x_7 = self.features[7](x_6)  # -> torch.Size([1, 768, 12, 12])
+        else:
+            x_0 = self.features[0](x)  # -> torch.Size([1, 96, 100, 100])
+            x_1 = self.features[1](x_0)  # -> torch.Size([1, 96, 100, 100])
+            x_2 = self.features[2](x_1)  # -> torch.Size([1, 192, 50, 50])
+            x_3 = self.features[3](x_2)  # -> torch.Size([1, 192, 50, 50])
+            x_4 = self.features[4](x_3)  # -> torch.Size([1, 384, 25, 25])
+            x_5 = self.features[5](x_4)  # -> torch.Size([1, 384, 25, 25])
+            x_6 = self.features[6](x_5)  # -> torch.Size([1, 768, 12, 12])
+            x_7 = self.features[7](x_6)  # -> torch.Size([1, 768, 12, 12])
 
         # Decode
         out = self.transpose_block1(x_7)  # -> torch.Size([1, 512, 25, 25])

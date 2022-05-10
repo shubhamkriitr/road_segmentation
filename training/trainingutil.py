@@ -30,6 +30,11 @@ class BaseTrainer(object):
                  optimizer: Optimizer,
                  batch_callbacks=[], epoch_callbacks=[], config={}) -> None:
         self.model = model
+        try:
+            self.model_event_handler = self.model.handle_event
+        except AttributeError:
+            self.model_event_handler = None
+            pass # TODO: warn
         self.cost_function = cost_function
         self.dataloader = dataloader
         self.batch_callbacks = batch_callbacks
@@ -41,9 +46,18 @@ class BaseTrainer(object):
         self.num_epochs = self.config["num_epochs"]
         self.optimizer = optimizer
 
+    def process_events(self, current_epoch):
+        if self.model_event_handler is None: return
+        try:
+            for event in self.config["events"][current_epoch]:
+                self.model_event_handler(event)
+        except KeyError: # no events for the current epoch
+            pass
+
     def train(self):
         global_batch_number = 0
         current_epoch_batch_number = 0
+        self.process_events(current_epoch=0)
         for current_epoch in range(1, self.num_epochs + 1):
             current_epoch_batch_number = 0
             for batch_data in self.dataloader:
@@ -55,6 +69,7 @@ class BaseTrainer(object):
                                    current_epoch, current_epoch_batch_number)
             self.invoke_epoch_callbacks(self.model, batch_data, global_batch_number,
                                         current_epoch, current_epoch_batch_number)
+            self.process_events(current_epoch)
 
     def training_step(self, batch_data, global_batch_number, current_epoch,
                       current_epoch_batch_number):
@@ -218,9 +233,7 @@ class ExperimentPipeline(BaseExperimentPipeline):
                                 optimizer=self.optimizer,
                                 batch_callbacks=self.batch_callbacks,
                                 epoch_callbacks=self.epoch_callbacks,
-                                config={
-                                    "num_epochs": self.config["num_epochs"]
-                                }
+                                config=self.config
                                 )
 
         self.trainer = trainer
