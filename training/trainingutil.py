@@ -633,7 +633,7 @@ class EnsemblePipeline(ExperimentPipelineForSegmentation):
                     conf_data[key] = override_dict[key]
             except KeyError: # no override config
                 pass
-            models.append(run_experiment(conf_data, return_model=True))
+            models.append(run_experiment(conf_data, return_model=True, ignore_ensemble=True))
         ensemble = Ensemble(models)
         self.compute_and_log_evaluation_metrics(ensemble, 0, "val")
         if self.master_config["create_submission"]: self.create_submission(model=ensemble)
@@ -641,8 +641,8 @@ class EnsemblePipeline(ExperimentPipelineForSegmentation):
 
 # was originally part of run_experiment module but it is used for ensembling, which means trainingutil would
 # have to import run_experiment, which would create a cyclic dependency
-def run_experiment(config_data, return_model=False):
-    if "ensemble" in config_data:
+def run_experiment(config_data, return_model=False, ignore_ensemble=False):
+    if "ensemble" in config_data and not ignore_ensemble:
         pipeline_class = EnsemblePipeline
     else:
         pipeline_class = PIPELINE_NAME_TO_CLASS_MAP[config_data["pipeline_class"]]
