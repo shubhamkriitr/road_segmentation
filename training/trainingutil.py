@@ -669,7 +669,7 @@ def run_experiment(config_data, return_model=False):
     if return_model: return pipeline.trainer.model
 
 if __name__ == "__main__":
-    DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_02_resnet50_split.yaml"
+    DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_03_resnet50_split.yaml"
     argparser = ArgumentParser()
     argparser.add_argument("--config", type=str,
                            default=DEFAULT_CONFIG_LOCATION)
