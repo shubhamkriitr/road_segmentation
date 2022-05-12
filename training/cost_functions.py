@@ -177,11 +177,15 @@ class TverskyLoss(Loss):
         super().__init__(size_average, reduce, reduction)
         self.beta = beta
         self.eps = 1e-9
+        if reduction != "mean":
+            raise ValueError(f"Reduction {reduction} is not allowed")
 
     def forward(self, input, target):
         nr = target*input
         dr = nr + self.beta*(1-target)*input + (1-self.beta)*target*(1-input)
-        return 1. - (1 + nr)/(1 + dr + self.eps)
+        cost =  1. - (1 + nr)/(1 + dr + self.eps)
+        return torch.mean(cost)
+        
 
 class EdgeWeightedSoftBootstrappedDiceLoss(Loss):
     def __init__(self, beta=0.9, edge_weight_factor=10, size_average=None,
