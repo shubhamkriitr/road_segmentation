@@ -212,6 +212,35 @@ class CILRoadSegmentationDataset(Dataset):
 
         return input_image, groundtruth
 
+class CILEnsembleDataset(CILRoadSegmentationDataset):
+    def __init__(self,
+                 root_dir: str,
+                 split,
+                 num_splits,
+                 image_folder="images",
+                 label_folder="groundtruth",  # Set to none if no supervision
+                 base_transformations=default_base_transformations,
+                 # Dictionary where key is class to be applied, value is the probability
+                 additional_transformations=default_additional_transformations,
+                 normalize=True):
+        self.num_splits = num_splits
+        self.split = split
+        assert 0 <= split < num_splits, f"Split {split} outside range [0,{num_splits}]"
+        super().__init__(root_dir, image_folder, label_folder, base_transformations,
+                        additional_transformations, normalize)
+
+    def _inspect_rootdir(self):
+        super()._inspect_rootdir()
+        split_size = (self.num_samples + self.num_splits - 1) // self.num_splits
+        res = self.num_samples % self.num_splits
+        split_start = split_size * self.split
+        split_end = split_size * (self.split + 1)
+        if res > 0 and self.split >= res:
+            split_start -= (self.split - res)
+            split_end -= (self.split + 1 - res)
+        self.image_names = self.image_names[:split_start] + self.image_names[split_end:]
+        self.num_samples = len(self.image_names)
+
 
 def get_dataset(root_dir: str,
                 base_transformations="default",
@@ -278,6 +307,79 @@ class VanillaDataLoaderUtil(object):
 
         return train_loader, val_loader, test_loader
 
+def get_split_dataset(root_dir: str,
+                num_splits,
+                base_transformations="default",
+                additional_transformations="default",
+                normalize=True,
+                image_folder="images",
+                label_folder="groundtruth"):
+    base_transformations = default_base_transformations if base_transformations == "default" else base_transformations if type(
+        base_transformations) is dict else None
+    additional_transformations = default_additional_transformations if additional_transformations == "default" else additional_transformations if type(
+        additional_transformations) is dict else None
+
+    dataset_splits = []
+    for i in range(num_splits):
+        dataset_splits.append(CILEnsembleDataset(root_dir=root_dir,
+                                    split=i,
+                                    num_splits=num_splits,
+                                    base_transformations=base_transformations,
+                                    additional_transformations=additional_transformations,
+                                    normalize=normalize,
+                                    image_folder=image_folder,
+                                    label_folder=label_folder))
+    return dataset_splits
+
+
+def get_ensemble_dataloaders(root_dir: str,
+                                num_splits,
+                                batch_size: int = 10,
+                                shuffle: bool = True,
+                                normalize: bool = True,
+                                base_transformations="default",
+                                additional_transformations="default",
+                                image_folder="images",
+                                label_folder="groundtruth"):
+    assert "split" in os.listdir(root_dir) and "test" in os.listdir(
+        root_dir), "You must provide the path to the root data folder. In it there should be a /split and /test folder"
+    train_path = os.path.join(root_dir, 'split')
+    test_path = os.path.join(root_dir, 'test')
+    train_datasets = get_split_dataset(os.path.join(train_path, 'train'), num_splits, base_transformations, 
+                                additional_transformations, normalize, image_folder, label_folder)
+    validation_dataset = get_dataset(os.path.join(train_path, 'test'), None, None, normalize, image_folder,
+                                     label_folder)
+
+    # Load test data
+    test_dataset = get_dataset(test_path, None, None, normalize, image_folder, None)
+
+    train_loaders = [torch.utils.data.DataLoader(d, batch_size=batch_size,
+                                       shuffle=shuffle) for d in train_datasets]
+    return train_loaders, torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, shuffle=shuffle), \
+                            torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+
+class EnsembleDataLoaderUtil(object):
+    def __init__(self, config=None) -> None:
+        self.config = config
+        self.num_splits = config["num_folds"] if config.get("num_folds", None) is not None else 5
+
+    def get_data_loaders(self, root_dir: str,
+                         batch_size: int = 10,
+                         shuffle: bool = True,
+                         normalize: bool = True):
+        """
+        Returns tuple of (train_loader, val_loader, test_loader)
+        """
+        train_loader, val_loader, test_loader = get_ensemble_dataloaders(
+            root_dir=root_dir,
+            num_splits=self.num_splits,
+            batch_size=batch_size,
+            shuffle=shuffle,
+            normalize=normalize
+        )
+
+        return train_loader, val_loader, test_loader
+
 class DeepGlobeLoaderUtil(object):
     def __init__(self, config=None) -> None:
         self.config = config  # currently not in use (adding for extension)#TODO
@@ -301,7 +403,8 @@ class DeepGlobeLoaderUtil(object):
 DATALOADER_UTIL_CLASS_MAP = {
     "VanillaDataLoaderUtil": VanillaDataLoaderUtil,
     "DeepGlobeLoaderUtil": DeepGlobeLoaderUtil,
-    "VanillaTestDataLoaderUtil": VanillaDataLoaderUtil
+    "VanillaTestDataLoaderUtil": VanillaDataLoaderUtil,
+    "EnsembleDataLoaderUtil": EnsembleDataLoaderUtil
 }
 
 class DataLoaderUtilFactory(BaseFactory):
