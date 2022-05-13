@@ -185,6 +185,58 @@ class TverskyLoss(Loss):
         dr = nr + self.beta*(1-target)*input + (1-self.beta)*target*(1-input)
         cost =  1. - (1 + nr)/(1 + dr + self.eps)
         return torch.mean(cost)
+    
+class FocalTverskyLoss(Loss):
+    def __init__(self, beta=0.9, size_average=None, reduce=None, reduction: str = 'mean') -> None:
+        super().__init__(size_average, reduce, reduction)
+        self.beta = beta
+        self.eps = 1e-9
+        if reduction != "mean":
+            raise ValueError(f"Reduction {reduction} is not allowed")
+        self._upper_cutoff = 0.3
+        self._lower_cutoff = 0.05
+        
+        self._max_ratio = 0.0 # of positive pixels in ground truth
+        self._min_ratio = 1.0
+
+    def forward(self, input, target):
+        nr = target*input
+        dr = nr + self.beta*(1-target)*input + (1-self.beta)*target*(1-input)
+        
+        nr = torch.sum(nr, dim=(1, 2, 3), keepdim=True)
+        dr = torch.sum(dr, dim=(1, 2, 3), keepdim=True)
+        
+        tversky_indices = nr/ (dr + self.eps)
+        cost =  1. - tversky_indices
+        
+        gammas = self.compute_gamma(input=input, target=target)
+        
+        cost = torch.pow(cost, gammas)
+        
+        cost = torch.mean(cost)
+        
+        return cost
+    
+    def compute_gamma(self, input, target):
+        positive_fractions = torch.mean(target, dim=(1, 2, 3), keepdim=True)
+        
+        positive_fractions = torch.clamp(positive_fractions,
+                                         min=self._lower_cutoff,
+                                         max=self._upper_cutoff)
+        
+        max_ = torch.max(positive_fractions)
+        min_ = torch.min(positive_fractions)
+    
+        
+        if min_ < self._min_ratio:
+            self._min_ratio = min_
+        if max_ > self._max_ratio:
+            self._max_ratio = max_
+        
+        gammas = 3*(positive_fractions - self._min_ratio)\
+                    /(self._max_ratio - self._min_ratio + 1e-9)
+                    
+        return gammas
         
 
 class EdgeWeightedSoftBootstrappedDiceLoss(Loss):
@@ -219,7 +271,8 @@ COST_FUNCTION_NAME_TO_CLASS_MAP = {
         EdgeWeightedSoftBootstrappedDiceLoss,
     "PatchedBinaryGeneralizeDiceLoss": PatchedBinaryGeneralizeDiceLoss,
     "TverskyLoss": TverskyLoss,
-    "BinaryGeneralizeDiceLossV2": BinaryGeneralizeDiceLossV2
+    "BinaryGeneralizeDiceLossV2": BinaryGeneralizeDiceLossV2,
+    "FocalTverskyLoss": FocalTverskyLoss
 }
 
 
