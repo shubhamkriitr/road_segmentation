@@ -218,7 +218,8 @@ COST_FUNCTION_NAME_TO_CLASS_MAP = {
     "EdgeWeightedSoftBootstrappedDiceLoss": \
         EdgeWeightedSoftBootstrappedDiceLoss,
     "PatchedBinaryGeneralizeDiceLoss": PatchedBinaryGeneralizeDiceLoss,
-    "TverskyLoss": TverskyLoss
+    "TverskyLoss": TverskyLoss,
+    "BinaryGeneralizeDiceLossV2": BinaryGeneralizeDiceLossV2
 }
 
 
