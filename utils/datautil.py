@@ -104,11 +104,10 @@ default_base_transformations = {IdentityTransform(): 0.25,
                                 SegRotationTransform(): 0.25}
 
 # Then these will be applied on top of the previous ones
-default_additional_transformations = {IdentityTransform(): 0.3,
-                                      SegRotationTransform(): 0.2,
-                                      SegHorizontalFlip(): 0.2,
-                                      SegVerticalFlip(): 0.2,
-                                      SegAdjustBrightness(): 0.1}
+default_additional_transformations = {IdentityTransform(): 0.25,
+                                      SegRotationTransform(): 0.25,
+                                      SegHorizontalFlip(): 0.25,
+                                      SegVerticalFlip(): 0.25}
 
 
 class CILRoadSegmentationDataset(Dataset):
