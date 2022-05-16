@@ -395,17 +395,20 @@ class ExperimentPipeline(BaseExperimentPipeline):
         except Exception as exc:
             logger.exception(exc)
 
+    def load_best_model_to(self, model_obj):
+        best_file_name = [i for i in os.listdir(self.current_experiment_directory) if "best_model" in i][0]
+
+        # Load best model
+        self.model.load_state_dict(
+            torch.load(
+                os.path.join(self.current_experiment_directory, best_file_name),
+                map_location=commonutil.resolve_device()))
+
     def create_submission(self, model=None):
         logger.info("======== Creating submission file ========")
 
         if model is None:
-            best_file_name = [i for i in os.listdir(self.current_experiment_directory) if "best_model" in i][0]
-    
-            # Load best model
-            self.model.load_state_dict(
-                torch.load(
-                    os.path.join(self.current_experiment_directory, best_file_name),
-                    map_location=commonutil.resolve_device()))
+            self.load_best_model_to(self.model)
         else:
             self.model = model
 
@@ -724,7 +727,9 @@ def run_experiment(config_data, return_model=False, ignore_ensemble=False):
     pipeline = pipeline_class(config=config_data)
     pipeline.prepare_experiment()
     pipeline.run_experiment()
-    if return_model: return pipeline.trainer.model
+    if return_model:
+        pipeline.load_best_model_to(model)
+        return pipeline.trainer.model
 
 if __name__ == "__main__":
     DEFAULT_CONFIG_LOCATION = "experiment_configs/exp_03_resnet50_split.yaml"
