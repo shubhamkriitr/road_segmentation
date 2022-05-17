@@ -25,6 +25,15 @@ class Loss(nn.Module):
         self.reduction = reduction
 
 
+class BinaryCrossEntropyLoss(Loss):
+    def __init__(self, weight=None, size_average=None, reduce=None, reduction: str = 'mean') -> None:
+        super(BinaryCrossEntropyLoss, self).__init__(size_average, reduce, reduction)
+        self.bce = torch.nn.BCELoss(reduction=reduction)
+
+    def forward(self, input, target):
+        return self.bce(input.flatten(), target.flatten())
+
+
 class WeightedLoss(Loss):
     def __init__(self, weight=None, size_average=None, reduce=None, reduction: str = 'mean') -> None:
         super(WeightedLoss, self).__init__(size_average, reduce, reduction)
@@ -286,7 +295,8 @@ COST_FUNCTION_NAME_TO_CLASS_MAP = {
     "TverskyLoss": TverskyLoss,
     "DiceLoss": DiceLoss,
     "BinaryGeneralizeDiceLossV2": BinaryGeneralizeDiceLossV2,
-    "FocalTverskyLoss": FocalTverskyLoss
+    "FocalTverskyLoss": FocalTverskyLoss,
+    "BCE": BinaryCrossEntropyLoss
 }
 
 
