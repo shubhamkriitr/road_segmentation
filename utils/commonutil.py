@@ -65,11 +65,14 @@ def write_images(model, dataloader, path, threshold,
         with torch.no_grad():
             if next(model.parameters()).is_cuda:
                 x = x.cuda()
-            pred = model(x).cpu()
+            try:
+                pred = model(x).cpu()
+            except TypeError: # ImgEnsemble needs an extra argument
+                pred = model(x, b).cpu()
         thresholded = torch.where(pred >= threshold, torch.ones_like(pred), torch.zeros_like(pred)).numpy()
         pred = pred.numpy()
         y = y.cpu().numpy()[:, :1]
-        assert pred.shape == y.shape
+        assert pred.shape == y.shape, f"pred {pred.shape}, y {y.shape}"
         for i in range(pred.shape[0]):
             sample_index += 1
             imageio.imwrite(f"{path}/{b}-{i}.png", (pred[i, 0]*255).astype(np.uint8))

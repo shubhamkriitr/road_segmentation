@@ -18,6 +18,7 @@ from training.cost_functions import CostFunctionFactory
 from submit.mask_to_submission import python_execution as mask_to_submission
 import copy
 import numpy as np
+import PIL
 
 def merge_dicts(initial, override):
     ret = {}
@@ -211,13 +212,20 @@ class ExperimentPipeline(BaseExperimentPipeline):
         dataloader_util_class_name = self.config["dataloader_util_class_name"]
         train_batch_size = self.config["batch_size"]
 
+        dataloader_config = {"num_splits": self.config["ensemble_data_splits"]} \
+            if "ensemble_data_splits" in self.config else None
         train_loader, val_loader, test_loader \
             = DataLoaderUtilFactory() \
-            .get(dataloader_util_class_name, config=None) \
+            .get(dataloader_util_class_name, config=dataloader_config) \
             .get_data_loaders(root_dir=self.config["data_root_dir"],
                               batch_size=train_batch_size,
                               shuffle=self.config["shuffle"],
                               normalize=self.config["normalize"])
+        try:
+            i = self.config["ensemble_dataloader_idx"]
+            train_loader = train_loader[i]
+        except KeyError:
+            pass
 
         self.train_loader = train_loader
         self.val_loader = val_loader
@@ -434,7 +442,8 @@ class ExperimentPipeline(BaseExperimentPipeline):
 class ExperimentPipelineForSegmentation(ExperimentPipeline):
     def __init__(self, config, overwrite_config={}, evaluation=False) -> None:
         security_overwrite = {
-            "experiment_directory": None} if evaluation is False else {}  # Ensure we do not overwrite existing experiment by mistake in training
+            "experiment_directory": None # Ensure we do not overwrite existing experiment by mistake in training
+        } if evaluation is False and not config.get("ensembling") else {}
         super().__init__(config, merge_dicts(overwrite_config, security_overwrite))
         self.best_metric = None
 
@@ -573,7 +582,10 @@ class ExperimentPipelineForSegmentation(ExperimentPipeline):
                               target.to(commonutil.resolve_device())
 
                 # forward pass
-                pred = model.forward(inp)
+                try:
+                    pred = model.forward(inp)
+                except TypeError:
+                    pred = model.forward(inp, i)
                 loss = self.cost_function(pred, target)
                 eval_loss += loss.item()
                 predictions.append(pred)
@@ -689,10 +701,40 @@ class Ensemble(torch.nn.Module):
         return y
 
 
+class ImgEnsemble(torch.nn.Module):
+    def __init__(self, models=[]):
+        super().__init__()
+        self.models = models
+        self.dummy_params = nn.Conv1d(1, 1, 1) # some parts of the code assume the model has some weiths and crash otherwise
+    def add_model(self, model):
+        self.models.append(model)
+    def forward(self, x, batch_num):
+        i = 0
+        batch = []
+        first_path = self.models[0] + "/0-0.png"
+        assert os.path.exists(first_path), f"nonexistent path: {first_path}"
+        while os.path.exists(self.models[0] + f"/{batch_num}-{i}.png"):
+            mask = None
+            for m in self.models:
+                model_mask = np.asarray(PIL.Image.open(m + f"/{batch_num}-{i}.png")) / 255
+                if mask is None:
+                    mask = model_mask
+                else:
+                    mask += model_mask
+            mask /= len(self.models)
+            batch.append(mask)
+            i += 1
+        if len(batch) != x.shape[0]:
+            logger.warning(f"batch {batch_num}: expected batch size {len(batch)}, found input bs {x.shape[0]}")
+        batch = batch[:x.shape[0]]
+        return torch.tensor(np.stack(batch)).unsqueeze(1).cuda()
+
+
 class EnsemblePipeline(ExperimentPipelineForSegmentation):
     def __init__(self, config):
         super().__init__(config)
         self.master_config = config
+        self.master_config["ensembling"] = True
 
     def prepare_experiment(self):
         self.prepare_summary_writer()
@@ -703,24 +745,39 @@ class EnsemblePipeline(ExperimentPipelineForSegmentation):
     
     def run_experiment(self):
         models = []
-        for conf_path in self.master_config["ensemble"]:
-            conf_data = merge_dicts(self.master_config, read_config(conf_path))
-            try:
-                override_dict = self.master_config["override"]
-                for key in override_dict.keys():
-                    conf_data[key] = override_dict[key]
-            except KeyError: # no override config
-                pass
-            models.append(run_experiment(conf_data, return_model=True, ignore_ensemble=True))
-        ensemble = Ensemble(models)
+        img_dir_suffix = "/output_images/test"
+        if "ensemble" in self.master_config:
+            for i, conf_path in enumerate(self.master_config["ensemble"]):
+                self.master_config["experiment_directory"] = self.current_experiment_directory + f"/{i}"
+                conf_data = merge_dicts(self.master_config, read_config(conf_path))
+                try:
+                    override_dict = self.master_config["override"]
+                    for key in override_dict.keys():
+                        conf_data[key] = override_dict[key]
+                except KeyError: # no override config
+                    pass
+                run_experiment(conf_data, ignore_ensemble=True)
+                models.append(self.master_config["experiment_directory"] + img_dir_suffix)
+        else:
+            ensemble_data_splits = self.master_config["ensemble_data_splits"]
+            for i in range(ensemble_data_splits):
+                self.master_config["experiment_directory"] = self.current_experiment_directory + f"/{i}"
+                logger.info(f"training network {i+1}/{ensemble_data_splits} for the split-ensemble")
+                os.makedirs(self.current_experiment_directory, exist_ok=True)
+                self.master_config["ensemble_dataloader_idx"] = i
+                run_experiment(self.master_config, ignore_split_ensemble=True)
+                models.append(self.master_config["experiment_directory"] + img_dir_suffix)
+        ensemble = ImgEnsemble(models)
         self.compute_and_log_evaluation_metrics(ensemble, 0, "val")
         if self.master_config["create_submission"]: self.create_submission(model=ensemble)
 
 
 # was originally part of run_experiment module but it is used for ensembling, which means trainingutil would
 # have to import run_experiment, which would create a cyclic dependency
-def run_experiment(config_data, return_model=False, ignore_ensemble=False):
-    if "ensemble" in config_data and not ignore_ensemble:
+def run_experiment(config_data, return_model=False, ignore_ensemble=False, ignore_split_ensemble=False):
+    config_data = config_data.copy()
+    if ignore_ensemble: config_data.pop("ensemble", None)
+    if "ensemble" in config_data or ("ensemble_data_splits" in config_data and not ignore_split_ensemble):
         pipeline_class = EnsemblePipeline
     else:
         pipeline_class = PIPELINE_NAME_TO_CLASS_MAP[config_data["pipeline_class"]]
@@ -728,6 +785,7 @@ def run_experiment(config_data, return_model=False, ignore_ensemble=False):
     pipeline.prepare_experiment()
     pipeline.run_experiment()
     if return_model:
+        model = pipeline.trainer.model
         pipeline.load_best_model_to(model)
         return pipeline.trainer.model
 
