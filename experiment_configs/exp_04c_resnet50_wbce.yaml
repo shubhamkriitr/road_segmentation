@@ -13,7 +13,7 @@ val_split: 0.2 # TODO: currently NOT being used - It is assumed that dataloader
 model_class_name: "PrunedResnet50" # The network to use e.g. UNet
 load_from_checkpoint: false
 checkpoint_path: ""
-cost_function_class_name: "BinaryGeneralizeDiceLoss"
+cost_function_class_name: "weighted_bce_loss"
 threshold: 0.5
 trainer_class_name: "NetworkTrainer"
 num_epochs: 100
