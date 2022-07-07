@@ -1,7 +1,7 @@
 pipeline_class: "ExperimentPipelineForSegmentation" # choose the pipeline
 experiment_metadata:
-  description: "Resnet50 with Generlaized Dice Loss"
-  tag: "exp_04a_resnet50_gdl"
+  description: "Resnet50 with Weighted BCE"
+  tag: "exp_04a_resnet50_wbce"
 device: "cuda" # TODO: take device info from `resolve_device`
 dataloader_util_class_name: "VanillaDataLoaderUtil" # This utility class
 # is supposed to return loaders upon invoking its `get_data_loaders`
@@ -26,7 +26,7 @@ logdir: "runs"
 batch_log_frequency: 1 # Print log after after these many batches
 tensorboard_log_frequency: 1 # Log scalars after these many batches
 model_save_frequency: 2 # frequency in epochs
-model_name_tag: "resnet50_split" # it will be included in the model file name
+model_name_tag: "exp_04a_resnet50_wbce" # it will be included in the model file name
 save_images: false
 test_batch_size: 100 # TODO: currently NOT being used
 do_class_weighting: null
