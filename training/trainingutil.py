@@ -212,7 +212,8 @@ class ExperimentPipeline(BaseExperimentPipeline):
         dataloader_util_class_name = self.config["dataloader_util_class_name"]
         train_batch_size = self.config["batch_size"]
 
-        dataloader_config = {"num_splits": self.config["ensemble_data_splits"]} \
+        data_splits = self.config["ensemble_data_splits"]
+        dataloader_config = {"num_folds": data_splits} \
             if "ensemble_data_splits" in self.config else None
         train_loader, val_loader, test_loader \
             = DataLoaderUtilFactory() \
@@ -223,6 +224,8 @@ class ExperimentPipeline(BaseExperimentPipeline):
                               normalize=self.config["normalize"])
         try:
             i = self.config["ensemble_dataloader_idx"]
+            assert len(train_loader) == data_splits, \
+                f"asked for {data_splits} dataloaders but got {len(train_loader)} of them"
             train_loader = train_loader[i]
         except KeyError:
             pass
