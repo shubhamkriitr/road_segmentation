@@ -285,6 +285,7 @@ COST_FUNCTION_NAME_TO_CLASS_MAP = {
     "ClassWeightedBinaryGeneralizeDiceLoss": \
         ClassWeightedBinaryGeneralizeDiceLoss,
     "BinaryGeneralizeDiceLoss": BinaryGeneralizeDiceLoss,
+    "EdgeWeightedBinaryGeneralizeDiceLoss": EdgeWeightedBinaryGeneralizeDiceLoss,
     "weighted_bce_loss": lambda: weighted_bce_loss,
     "ThresholdedBinaryGeneralizedDiceLoss": \
         ThresholdedBinaryGeneralizedDiceLoss,
