@@ -3,7 +3,8 @@ from utils.commonutil import BaseFactory
 
 # models
 from models.model_resnet50 import (get_frozen_pruned_resnet50, get_pruned_resnet50,
-                                   get_split_pruned_resnet50, get_split_pruned_multiscale_resnet50)
+                                   get_split_pruned_resnet50, get_split_pruned_multiscale_resnet50,
+                                   PrunedResnet50)
 from models.baseline_unet import BaselineUNet
 from models.efficient_unet import EfficientUNet
 from models.model_convnext import (get_pruned_convnext_small, get_pruned_convnext_tiny)
@@ -13,6 +14,7 @@ from models.fcn8s import FCN8s
 MODEL_NAME_TO_CLASS_OR_INTIALIZER_MAP = {
     "FrozenPrunedResnet50": get_frozen_pruned_resnet50,
     "PrunedResnet50": get_pruned_resnet50,
+    "PrunedResnet50[No pretrained weights]": PrunedResnet50,
     "BaselineUNet": BaselineUNet,
     "EfficientUNet": EfficientUNet,
     "PrunedConvnextTiny": get_pruned_convnext_tiny,
