@@ -21,7 +21,7 @@ batch_size: 10
 optimizer_class_name: "AdamW"
 learning_rate: 0.001
 scheduler: "ReduceLROnPlateau"
-weight_decay: 0.0001
+weight_decay: 0.01
 logdir: "runs"
 batch_log_frequency: 1 # Print log after after these many batches
 tensorboard_log_frequency: 1 # Log scalars after these many batches
