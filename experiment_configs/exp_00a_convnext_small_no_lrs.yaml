@@ -2,7 +2,7 @@ pipeline_class: "ExperimentPipelineForSegmentation" # choose the pipeline
 experiment_metadata:
   description: "Training this model for submission. This is convnext small model with \
     pretrained weights (none of its weights are frozen)"
-  tag: "exp_00_convnext_small"
+  tag: "exp_00a_convnext_small_no_lrs"
 device: "cuda" # TODO: take device info from `resolve_device`
 dataloader_util_class_name: "VanillaDataLoaderUtil" # This utility class
 # is supposed to return loaders upon invoking its `get_data_loaders`
@@ -27,7 +27,7 @@ logdir: "runs"
 batch_log_frequency: 1 # Print log after after these many batches
 tensorboard_log_frequency: 1 # Log scalars after these many batches
 model_save_frequency: 2 # frequency in epochs
-model_name_tag: "convnext_small" # it will be included in the model file name
+model_name_tag: "exp_00a_convnext_small_no_lrs" # it will be included in the model file name
 save_images: false
 test_batch_size: 100 # TODO: currently NOT being used
 do_class_weighting: null
