@@ -93,6 +93,18 @@ class DiceLoss(Loss):
             / (torch.sum(input*input + target*target) + 1e-8)
         return cost
 
+class DiceLossV2(Loss):
+    def __init__(self, size_average=None, reduce=None, reduction: str = 'mean') -> None:
+        super().__init__(size_average, reduce, reduction)
+
+    def forward(self, input, target):
+        """Assumes input and target are of shape: (Batch, 1, H, W)
+        Where for each item in the batch, the slice along channel
+        is a probabilty map for ouput class with label id `1`.
+        """
+        cost = 1 - 2 * torch.sum(input * target) / (torch.sum(input + target) + 1e-7)
+        return cost
+
 class PatchedBinaryGeneralizeDiceLoss(Loss):
     def __init__(self, size_average=None, reduce=None, reduction: str = 'mean', patch_size=16) -> None:
         super().__init__(size_average, reduce, reduction)
@@ -310,6 +322,7 @@ COST_FUNCTION_NAME_TO_CLASS_MAP = {
     "PatchedBinaryGeneralizeDiceLoss": PatchedBinaryGeneralizeDiceLoss,
     "TverskyLoss": TverskyLoss,
     "DiceLoss": DiceLoss,
+    "DiceLossV2": DiceLossV2,
     "BinaryGeneralizeDiceLossV2": BinaryGeneralizeDiceLossV2,
     "FocalTverskyLoss": FocalTverskyLoss,
     "BCE": BinaryCrossEntropyLoss
