@@ -62,7 +62,22 @@ class BinaryGeneralizeDiceLoss(Loss):
         Where for each item in the batch, the slice along channel
         is a probabilty map for ouput class with label id `1`.
         """
-        cost = 1 - 2 * torch.sum(input * target) / (torch.sum(input + target) + 1e-7)
+        
+        n_1 = target.sum((2, 3))
+        w_1 = 1/(n_1*n_1)
+        
+        n_0 = (1. - target).sum((2, 3))
+        w_0 = 1/(n_0*n_0)
+        
+        wt_intersect = w_1*((input * target).sum((2, 3))) + \
+            w_0*( ( (1. - input) * (1. - target) ).sum((2, 3)) )
+        wt_union = w_1*((input + target).sum((2, 3))) + \
+            w_0*(((1. - input) + (1. - target)).sum((2, 3)))
+            
+        cost = (1 - (2 * wt_intersect)/(wt_union + 1e-7))
+        cost = cost.sum()
+        
+        # >>> cost = 1 - 2 * torch.sum(input * target) / (torch.sum(input + target) + 1e-7)
         return cost
 
 class DiceLoss(Loss):
