@@ -25,7 +25,7 @@
 To replicate our experiments, it should be possible to put the dataset zip (the official one provided with the project - https://polybox.ethz.ch/index.php/s/AGkDmbC8IfmtBkr/download?path=%2F&files=cil-road-segmentation-2022.zip) in the repository, call `source ./setup.sh` to prepare the environment and finally `source ./replicate.sh` to run the experiment. However please note that these scripts have not undergone extensive testing, so read the rest of the README and if needed, follow the appropriate steps manually. Also, both of these scripts need internet access. 
 
 # Manual replication
-The configuration files of the final experiment are located in `experiment_configs/final`. The main config to be used is `config.yaml`. The experiments can be run by `python3 run_experiment.py --config config.yaml`.
+The configuration files of the final experiment are located in `experiment_configs/final`. The main config to be used is `config.yaml`. The experiments can be run by `python3 run_experiment.py --config config.yaml`. _e.g._ `python3 run_experiment.py --config experiment_configs/exp_04a2_resnet50_gdl.yaml`, _for experimenting with Resnet50 with Generlaized Dice Loss._
 
 A checkpoint called `globe.ckpt` is needed. This is the checkpoint after training ConvNext on DeepGlobe data and can be downloaded from https://polybox.ethz.ch/index.php/s/1fAbWrYUuf3oLWP.
 Furthermore, to run any experiments, the path to the data needs to be specified in the config under the name `data_root_dir`, which is set to `data/` by default. This directory is expected to contain the following directory structure:
