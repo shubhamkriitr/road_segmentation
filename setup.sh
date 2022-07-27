@@ -3,6 +3,7 @@
 if unzip cil-road-segmentation-2022.zip # && rm -r __MACOSX/
 then
     mkdir -p data/split/test/images data/split/test/groundtruth
+    mkdir -p data/split/train
     mv cil-road-segmentation-2022/test data
     mv cil-road-segmentation-2022/training data/split/train
     val=$(cat validation-files-list.dat | sed -n 's/- satimage/satimage/p')
