@@ -1,15 +1,22 @@
+# Replication sing provided setup scripts
+To replicate our experiments, it should be possible to put the dataset zip (https://polybox.ethz.ch/index.php/s/AGkDmbC8IfmtBkr/download?path=%2F&files=cil-road-segmentation-2022.zip) in the repository, call `source ./setup.sh` to prepare the environment and finally `source ./replicate.sh` to run the experiment. However please note that these scripts have not undergone extensive testing, so read the rest of the README and if needed, follow the appropriate steps manually. Also, both of these scripts need internet access. Finally, please do not edit this README because the script reads the list of images belonging to the validation set is read from the README.
+
+# Manual replication
 The configuration files of the final experiment are located in `experiment_configs/final`. The main config to be used is `config.yaml`. The experiments can be run by `python3 run_experiment.py --config config.yaml`.
-To replicate the final experiments, a checkpoint called `globe.ckpt` is needed. This is the checkpoint after training ConvNext on DeepGlobe data and can be downloaded from https://polybox.ethz.ch/index.php/s/1fAbWrYUuf3oLWP.
+
+A checkpoint called `globe.ckpt` is needed. This is the checkpoint after training ConvNext on DeepGlobe data and can be downloaded from https://polybox.ethz.ch/index.php/s/1fAbWrYUuf3oLWP.
 Furthermore, to run any experiments, the path to the data needs to be specified in the config under the name `data_root_dir`, which is set to `data/` by default. This directory is expected to contain the following directory structure:
-- eval_split
+- split
     - train
         - groundtruth
         - images
-    - val
+    - test
         - groundtruth
         - images
+- test
+    - images
 
-The model is trained on the images from `eval_split/train` and `eval_split/val` is used as a validation set. We used a validation set consisting of the following images:
+The model is trained on the images from `split/train`, `split/test` is used as a validation set. We used a validation set consisting of the following images:
 - satimage_107.png
 - satimage_126.png
 - satimage_129.png
@@ -40,8 +47,15 @@ The model is trained on the images from `eval_split/train` and `eval_split/val` 
 - satimage_94.png
 - satimage_95.png
 
-For the final experiment, we included the validation set in the training data (by copying the aforementioned images to `eval_split/train`). We left copies of these images in `eval_split/val`, consequently the validation numbers were generated but unreliable. The behavior of the pipeline in case the images were deleted from `eval_split/val` is unknown to us.
+For the final experiment, we included the validation set in the training data (by copying the aforementioned images to `split/train`). We left copies of these images in `split/test`, consequently the validation numbers were generated but unreliable. The behavior of the pipeline in case the images were deleted from `split/test` is unknown to us.
 
-The configuration of the experiment with regular (non-generalized) Dice loss (also reaching 93.3%) can be found in `experiment_configs/old_dice_final`.
+The required packages are listed in `requirements.txt` and can be installed using `pip3 install -r requirements.txt`.
+
+# Other notes
+We used python3 3.8.13+ during development.
+
+The configuration of the experiment with regular (non-generalized) Dice loss (also reaching 93.3%) can be found in `experiment_configs/old_dice_final`. Note that when ensembling is requested in the config, the configs to be ensembled are looked for on the path relative to the current working directory (not the original config directory). The same holds for the path to the data directory. Consequently, the working directory matters and for some configs it might be required to move some files. We took steps to ensure no file movement is needed for replicating the `final` and `old_dice_final` experiments provided the working directory is the root of the repository.
 
 Please note that the Dice loss which is referred from the report is DiceLossV2 from this repository and if ensembles are used, the validation scores are also generated but unreliable.
+
+Moreover, on the first run, ConvNext weights need to be downloaded, so please make sure the script has internet access, otherwise you may encounter problems even if you provide internet access later. Also, a number of checkpoints is saved, which takes up quite a bit of storage under the `runs` directory. If needed, it should help to change the save frequency in the config.

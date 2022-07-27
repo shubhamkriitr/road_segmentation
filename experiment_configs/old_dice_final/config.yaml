@@ -34,8 +34,8 @@ class_weighting_scheme: null
 compute_loss_on_patches: false
 create_submission: true
 ensemble:
-  - 1.yaml
-  - 2.yaml
-  - 3.yaml
-  - 4.yaml
-  - 5.yaml
+  - experiment_configs/old_dice_final/1.yaml
+  - experiment_configs/old_dice_final/2.yaml
+  - experiment_configs/old_dice_final/3.yaml
+  - experiment_configs/old_dice_final/4.yaml
+  - experiment_configs/old_dice_final/5.yaml
