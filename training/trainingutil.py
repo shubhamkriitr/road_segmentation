@@ -20,6 +20,8 @@ import copy
 import numpy as np
 import PIL
 
+"""This file contains most of the code implementing the pipeline behavior. The most commonly used is ExperimentPipelineForSegmentation and EnsemblePipeline. This code is also responsible for interpreting the config file and writing to logs."""
+
 def merge_dicts(initial, override):
     ret = {}
     for key in initial.keys(): ret[key] = initial[key]
@@ -688,6 +690,7 @@ PIPELINE_NAME_TO_CLASS_MAP = {
 
 
 class Ensemble(torch.nn.Module):
+    """Part of old ensembling implementation. Stores a number of models and averages their responses. It was replaced by a different method because the RAM size posed too severe limitations on the number of models ensembled."""
     def __init__(self, models=[]):
         super().__init__()
         self.models = torch.nn.ModuleList(models)
@@ -706,6 +709,7 @@ class Ensemble(torch.nn.Module):
 
 
 class ImgEnsemble(torch.nn.Module):
+    """The newer ensemble implementation. Reads probability maps stored as images on the disk."""
     def __init__(self, models=[]):
         super().__init__()
         self.models = models
@@ -735,6 +739,7 @@ class ImgEnsemble(torch.nn.Module):
 
 
 class EnsemblePipeline(ExperimentPipelineForSegmentation):
+    """A pipeline for training a number of models and ensembling them. calls `run_experiment`, which is the main function called when the training starts."""
     def __init__(self, config):
         super().__init__(config)
         self.master_config = config

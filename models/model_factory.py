@@ -10,6 +10,8 @@ from models.efficient_unet import EfficientUNet
 from models.model_convnext import (get_pruned_convnext_small, get_pruned_convnext_tiny)
 from models.fcn8s import FCN8s
 
+"""The code in this file is responsible for instantiating model objects. It contains the factory class for this task as well as the mapping from model names used in the config to the class names."""
+
 # model mapping
 MODEL_NAME_TO_CLASS_OR_INTIALIZER_MAP = {
     "FrozenPrunedResnet50": get_frozen_pruned_resnet50,

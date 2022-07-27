@@ -4,6 +4,10 @@ import torch.nn.functional as F
 import torch.nn.functional
 from utils.commonutil import resolve_device, BaseFactory
 
+"""
+This file contains loss function implementations, their mapping to names used in the config file, as well as the factory for these loss functions. Note mainly the BinaryGeneralizeDiceLoss and DiceLossV2 classes, which are the implementations of the two versions of Dice loss.
+"""
+
 base_bce = torch.nn.BCELoss(reduction='none')
 
 
@@ -54,6 +58,7 @@ class GeneralizeDiceLoss(WeightedLoss):
 
 
 class BinaryGeneralizeDiceLoss(Loss):
+    """One of the two final Dice loss versions."""
     def __init__(self, size_average=None, reduce=None, reduction: str = 'mean') -> None:
         super().__init__(size_average, reduce, reduction)
 
@@ -81,6 +86,7 @@ class BinaryGeneralizeDiceLoss(Loss):
         return cost
 
 class DiceLoss(Loss):
+    """Old Dice loss implementation"""
     def __init__(self, size_average=None, reduce=None, reduction: str = 'mean') -> None:
         super().__init__(size_average, reduce, reduction)
 
@@ -94,6 +100,7 @@ class DiceLoss(Loss):
         return cost
 
 class DiceLossV2(Loss):
+    """One of the two final Dice loss versions."""
     def __init__(self, size_average=None, reduce=None, reduction: str = 'mean') -> None:
         super().__init__(size_average, reduce, reduction)
 
@@ -106,6 +113,7 @@ class DiceLossV2(Loss):
         return cost
 
 class PatchedBinaryGeneralizeDiceLoss(Loss):
+    """Dice loss computed on patches simmilar to those used to generate the submission."""
     def __init__(self, size_average=None, reduce=None, reduction: str = 'mean', patch_size=16) -> None:
         super().__init__(size_average, reduce, reduction)
         self.pooling = torch.nn.AvgPool2d(kernel_size=patch_size, stride=patch_size)

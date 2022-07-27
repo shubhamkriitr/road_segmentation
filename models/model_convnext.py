@@ -7,6 +7,8 @@ import torch
 from torch import nn
 from utils.loggingutil import logger
 
+"""This file contains the implementation of our ConvNext-based model."""
+
 PRETAINED_MODEL_PATHS = {
     "torchvision": {
         "resnet50": "saved_models/torch/resnet50/resnet50-0676ba61.pth",

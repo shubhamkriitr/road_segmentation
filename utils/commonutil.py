@@ -8,6 +8,8 @@ import numpy as np
 from utils.loggingutil import logger
 import yaml
 
+"""This file contains different utils including config yaml parsing and image writing."""
+
 PROJECTPATH = Path(__file__).parent.parent
 
 # Shall we take device info from single source? #TODO

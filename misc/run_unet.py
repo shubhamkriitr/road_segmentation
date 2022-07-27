@@ -1,6 +1,8 @@
 from unet import *
 from train import train
 
+"""This file contains old code for training UNet. Obsoleted by trainingutil.py"""
+
 if __name__ == "__main__":
     print(f"will train on {device}")
     train_dataloader, test_dataloader = get_train_test_dataloaders("./data/training", train_split=0.8)

@@ -4,7 +4,9 @@ import torch
 import torch.nn as nn
 import torchvision
 
-class EfficientUNet(nn.Module): #TODO: change name
+"""This file contains the implementation of our EfficientNet-based model."""
+
+class EfficientUNet(nn.Module):
 
     def __init__(self, in_channels=3, out_channels=1):
         super(EfficientUNet, self).__init__()

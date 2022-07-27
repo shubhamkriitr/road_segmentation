@@ -10,6 +10,8 @@ import numpy as np
 import random
 from utils.commonutil import BaseFactory
 
+"""This file contains dataset implementation including geometrical transformations."""
+
 # TODO: better to take this from run config sigleton
 TENSOR_FLOAT_DTYPE = torch.float32
 GROUNDTRUTH_SHAPE = (400, 400)
@@ -212,6 +214,7 @@ class CILRoadSegmentationDataset(Dataset):
         return input_image, groundtruth
 
 class CILEnsembleDataset(CILRoadSegmentationDataset):
+    """Used for data ensembling. Splits the data into k parts and enables training on k datasets each containing k-1 of these parts."""
     def __init__(self,
                  root_dir: str,
                  split,
