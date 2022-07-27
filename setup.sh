@@ -5,7 +5,7 @@ then
     mkdir -p data/split/test/images data/split/test/groundtruth
     mv cil-road-segmentation-2022/test data
     mv cil-road-segmentation-2022/training data/split/train
-    val=$(cat README.md | sed -n 's/- satimage/satimage/p')
+    val=$(cat validation-files-list.dat | sed -n 's/- satimage/satimage/p')
     for file in $val
     do
         mv data/split/train/images/$file data/split/test/images
