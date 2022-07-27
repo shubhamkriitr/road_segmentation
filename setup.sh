@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if unzip cil-road-segmentation-2022.zip && rm -r __MACOSX/
+if unzip cil-road-segmentation-2022.zip # && rm -r __MACOSX/
 then
     mkdir -p data/split/test/images data/split/test/groundtruth
     mv cil-road-segmentation-2022/test data
