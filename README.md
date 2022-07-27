@@ -1,5 +1,28 @@
-# Replication sing provided setup scripts
-To replicate our experiments, it should be possible to put the dataset zip (the official one provided with the project - https://polybox.ethz.ch/index.php/s/AGkDmbC8IfmtBkr/download?path=%2F&files=cil-road-segmentation-2022.zip) in the repository, call `source ./setup.sh` to prepare the environment and finally `source ./replicate.sh` to run the experiment. However please note that these scripts have not undergone extensive testing, so read the rest of the README and if needed, follow the appropriate steps manually. Also, both of these scripts need internet access. Finally, please do not edit this README because the script reads the list of images belonging to the validation set is read from the README.
+
+
+# Replication using provided setup scripts
+
+- We have tested our code in an environment with
+
+- Python 3.8.13
+- OS
+```
+        LSB Version:	:core-4.1-amd64:core-4.1-noarch
+        Distributor ID:	CentOS
+        Description:	CentOS Linux release 7.9.2009 (Core)
+        Release:	7.9.2009
+        Codename:	Core
+``` 
+- CUDA
+```
+        nvcc: NVIDIA (R) Cuda compiler driver
+        Copyright (c) 2005-2020 NVIDIA Corporation
+        Built on Mon_Oct_12_20:09:46_PDT_2020
+        Cuda compilation tools, release 11.1, V11.1.105
+        Build cuda_11.1.TC455_06.29190527_0
+```
+
+To replicate our experiments, it should be possible to put the dataset zip (the official one provided with the project - https://polybox.ethz.ch/index.php/s/AGkDmbC8IfmtBkr/download?path=%2F&files=cil-road-segmentation-2022.zip) in the repository, call `source ./setup.sh` to prepare the environment and finally `source ./replicate.sh` to run the experiment. However please note that these scripts have not undergone extensive testing, so read the rest of the README and if needed, follow the appropriate steps manually. Also, both of these scripts need internet access. 
 
 # Manual replication
 The configuration files of the final experiment are located in `experiment_configs/final`. The main config to be used is `config.yaml`. The experiments can be run by `python3 run_experiment.py --config config.yaml`.
