@@ -85,7 +85,7 @@ The required packages are listed in `requirements.txt` and can be installed usin
     - Create the optimizer and schedulers
     - Prepare the data loader for training
     - Create the loss function and evaluation metrics
-    - Create output folder in the directory indicated by the `logdir` attribute of the config (default `runs`), and the tensorboard summary writer
+    - Create output folder in the directory indicated by the `logdir` attribute of the config (by default `runs`), and the tensorboard summary writer
     - Prepare batch and epoch callbacks
 - The `run_experiment` method in the pipeline executes training and creates a submission file with segmentations of the test images, using functions from the `mask_to_submission.py` script provided with the project, located in the `submit` directory.
 
@@ -94,7 +94,7 @@ The required packages are listed in `requirements.txt` and can be installed usin
 - Class `VanillaDataLoaderUtil` returns training, validation, and test data loaders for the training pipeline
 - Data loaders are created from dataset class `CILRoadSegmentationDataset`
 - Default configurations load the dataset from the `data` directory. This can be modified through the `data_root_dir` attribute in the config.
-- `CILRoadSegmentationDataset` performs several transforms such as normalizing the images and (for training data) applies rotation, and horizontal and vertical flips as data augmentation.
+- `CILRoadSegmentationDataset` performs several transforms such as normalizing the images and (for training data) applies rotation, and horizontal and vertical flips as data augmentation, implemented in classes `SegRotationTransform`, `SegHorizontalFlip`, and `SegVerticalFlip`.
 
 ### Models
 
