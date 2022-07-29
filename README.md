@@ -74,6 +74,38 @@ For the final experiment, we included the validation set in the training data (b
 
 The required packages are listed in `requirements.txt` and can be installed using `pip3 install -r requirements.txt`.
 
+# Code structure
+
+### Experiment Pipeline
+
+- The script `run_experiment.py` creates an `ExperimentPipelineForSegmentation` or an `EnsemblePipeline` if the experiment uses an ensemble model as indicated by the `ensemble` field in the configuration.
+- Then, it calls methods `prepare_experiment` and `run_experiment` on the pipeline.
+- `prepare_experiment` performs the following steps:
+    - Initialize the model to be trained
+    - Create the optimizer and schedulers
+    - Prepare the data loader for training
+    - Create the loss function and evaluation metrics
+    - Create output folder in the directory indicated by the `logdir` attribute of the config (default `runs`), and the tensorboard summary writer
+    - Prepare batch and epoch callbacks
+- The `run_experiment` method in the pipeline executes training and creates a submission file with segmentations of the test images, using functions from the `mask_to_submission.py` script provided with the project, located in the `submit` directory.
+
+### Data Loading (utils/datautil.py)
+
+- Class `VanillaDataLoaderUtil` returns training, validation, and test data loaders for the training pipeline
+- Data loaders are created from dataset class `CILRoadSegmentationDataset`
+- Default configurations load the dataset from the `data` directory. This can be modified through the `data_root_dir` attribute in the config.
+- `CILRoadSegmentationDataset` performs several transforms such as normalizing the images and (for training data) applies rotation, and horizontal and vertical flips as data augmentation.
+
+### Models
+
+- Several architectures can be loaded for training from `models/model_factory.py`
+- The class of the model to be trained can be indicated in `model_class_name` attribute of the config (e.g. `PrunedConvnextSmall`).
+
+### Cost functions
+
+- Several cost functions are available in `training/cost_functions.py` as losses for training the segmentation models.
+- The class of the loss to be used can be indicated in `cost_function_class_name` attribute of the config (e.g. `BinaryGeneralizeDiceLoss`).
+
 # Other notes
 We used python3 3.8.13+ during development.
 
