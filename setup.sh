@@ -1,7 +1,8 @@
 #!/bin/bash
 ZIP_FILE_WITHOUT_EXT="cil-road-segmentation-2022"
 mkdir -p $ZIP_FILE_WITHOUT_EXT
-if unzip $ZIP_FILE_WITHOUT_EXT.zip -d $ZIP_FILE_WITHOUT_EXT # && rm -r __MACOSX/
+wget "https://polybox.ethz.ch/index.php/s/yqbZH3QszgkGrDh/download" && mv download $ZIP_FILE_WITHOUT_EXT.zip
+if unzip $ZIP_FILE_WITHOUT_EXT.zip -d $ZIP_FILE_WITHOUT_EXT
 then
     mkdir -p data/split/test/images data/split/test/groundtruth
     mv $ZIP_FILE_WITHOUT_EXT/test data/
