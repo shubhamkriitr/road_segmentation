@@ -22,7 +22,7 @@
         Build cuda_11.1.TC455_06.29190527_0
 ```
 
-To replicate our experiments, it should be possible to call `source ./setup.sh` to prepare the environment and finally `source ./replicate.sh` to run the experiment. However please note that these scripts have not undergone extensive testing, so read the rest of the README and if needed, follow the appropriate steps manually. Also, both of these scripts need internet access.
+To replicate one of our experiments, it should be possible to call `source ./setup.sh` to prepare the environment and finally `source ./replicate.sh` to run the experiment. To replicate the experiment selected as final on kaggle, select to include the validation set in the training data when running setup.sh. However please note that these scripts have not undergone extensive testing, so read the rest of the README and if needed, follow the appropriate steps manually. Also, both of these scripts need internet access. If they are run once without internet access, it can cause problems for other runs, you may need to start fresh from the zip again.
 
 # Manual replication
 The configuration files of the final experiment are located in `experiment_configs/final`. The main config to be used is `config.yaml`. The experiments can be run by `python3 run_experiment.py --config config.yaml`. _e.g._ `python3 run_experiment.py --config experiment_configs/exp_04a2_resnet50_gdl.yaml`, _for experimenting with Resnet50 with Generlaized Dice Loss._

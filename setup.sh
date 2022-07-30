@@ -8,10 +8,23 @@ then
     mv $ZIP_FILE_WITHOUT_EXT/test data/
     mv $ZIP_FILE_WITHOUT_EXT/training/ data/split/train/
     val=$(cat validation-files-list.dat | sed -n 's/- satimage/satimage/p')
+    include_val=
+    while [ "$include_val" != y -a "$include_val" != n ]
+    do
+        echo "Do you want to include the validation set in the training data? [y/n]"
+        echo '(please type literally "y" or "n")'
+        read include_val
+    done
+    if [ "$include_val" == y ]
+    then
+        cmd=cp
+    else
+        cmd=mv
+    fi
     for file in $val
     do
-        mv data/split/train/images/$file data/split/test/images/
-        mv data/split/train/groundtruth/$file data/split/test/groundtruth/
+        $cmd data/split/train/images/$file data/split/test/images/
+        $cmd data/split/train/groundtruth/$file data/split/test/groundtruth/
     done
     
     echo -e "Will download the checkpoint.\nPress enter to continue"
